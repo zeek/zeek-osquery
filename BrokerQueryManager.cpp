@@ -303,6 +303,20 @@ void BrokerQueryManager::sendErrortoBro(std::string str)
     ptlocalhost->send(bTopic,msg);
 }
 
+void BrokerQueryManager::sendErrorBeforeGroupTopic(std::string str)
+{
+    broker::message msg;
+    //push event name, mapped at bro-side
+    msg.emplace_back("osquery::host_error");
+    // host message
+    msg.emplace_back(ptlocalhost->name());
+    //error message
+    msg.emplace_back(str);
+    //send event in the form of broker message
+    //ptlocalhost->send(bTopic,msg);
+    ptlocalhost->send("/bro/osquery/group/default",msg);
+}
+
 void BrokerQueryManager::sendReadytoBro()
 {
     broker::message msg;

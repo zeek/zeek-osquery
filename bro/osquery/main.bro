@@ -113,14 +113,8 @@ export {
 # Sent by us to the client for subscribing to an event.
 global host_subscribe: event(ev: string, query: string, utype: string, initdump: bool);
 
-# Sent by us to the client to signal end of the subscription list.
-global host_subscribe_end: event();
-
 # Sent by us to the client for unsubscribing from an event.
 global host_unsubscribe: event(ev: string, query: string, utype: string, initdump: bool);
-
-# Sent by us to the client to signal end of the unsubscription list.
-global host_unsubscribe_end: event();
 
 # Sent by us to set the topic for the client to publish its events with.
 global host_set_topic: event(topic: string);

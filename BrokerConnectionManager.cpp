@@ -39,13 +39,29 @@ BrokerConnectionManager::BrokerConnectionManager(std::string hostName,
 BrokerConnectionManager::~BrokerConnectionManager()
 {
     // query manager object deletion
-    delete qm;
+    if(qm != NULL)
+    {
+        delete qm;
+        qm = NULL;
+    }
     //local host object deletion
-    delete ptlocalhost;
+    if(ptlocalhost != NULL)
+    {
+        delete ptlocalhost;
+        ptlocalhost = NULL;
+    }
     // pooling object linked with message queue deletion
-    delete ptpfd;
+    if(ptpfd != NULL)
+    {
+        delete ptpfd;
+        ptpfd = NULL;
+    }
     // message queue deletion
-    delete ptmq;
+    if (ptmq != NULL)
+    {
+        delete ptmq;
+        ptmq = NULL;
+    }
 }
 
 bool BrokerConnectionManager::connectToMaster(std::string master_ip,
@@ -77,6 +93,7 @@ int BrokerConnectionManager::getAndSetTopic(std::string gTopic)
 { 
    
     delete ptpfd;
+    ptpfd = NULL;
     // pooling for message queue
     ptpfd = new pollfd{ptmq->fd(), POLLIN, 0};
     delete qm;

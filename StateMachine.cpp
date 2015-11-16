@@ -152,12 +152,13 @@ int StateMachine::processEventsInWaitForTopicState(int ev,
         }
         default:
         {
-            std::ostringstream stringStream;
-            stringStream << eventToString(ev) << " is not allowed in " <<
-                    "WAIT_FOR_TOPIC" << "expecting group topic events";
+            std::string stringStream;
+            stringStream = eventToString(ev)  + " is not allowed in " +
+                    "WAIT_FOR_TOPIC" + " expecting group topic events";
             LOG(WARNING) << stringStream;
-            ptBCM->getQueryManagerPointer()->
-                sendErrortoBro(stringStream.str());
+            
+            ptBCM->getQueryManagerPointer()->sendErrorBeforeGroupTopic(
+                        stringStream);
         }
     };
 }
@@ -221,12 +222,13 @@ int StateMachine::processEventsInGetAndProcessQueriesState(int ev,
         }
         default:
         {
-            std::ostringstream stringStream;
-            stringStream << eventToString(ev) << " is not allowed in " <<
-                  "GET_AND_PROCESS_QUERIES " << "expecting subscription events";
+            std::string stringStream;
+            stringStream = eventToString(ev)  + " is not allowed in " +
+                    "GET_AND_PROCESS_QUERIES" + " expecting subscribe/"
+                    "unsubscribe events";
             LOG(WARNING) << stringStream;
             ptBCM->getQueryManagerPointer()->
-                sendErrortoBro(stringStream.str());
+                sendErrortoBro(stringStream);
         }
     };
     
@@ -268,7 +270,11 @@ int StateMachine::processMasterQuery()
         // if connection is down then reinitialize all query vectors
         ptBCM->getQueryManagerPointer()->ReInitializeVectors();
         //delete  BrokerConnectionManager Object
-        delete ptBCM;
+        if(ptBCM != NULL)
+        {
+            delete ptBCM;
+            ptBCM = NULL;
+        }
     }
     else
     {
@@ -310,7 +316,11 @@ int StateMachine::processEventsInTerminateState()
     // if connection is down then reinitialize all query vectors
     ptBCM->getQueryManagerPointer()->ReInitializeVectors();
     //delete  BrokerConnectionManager Object
-    delete ptBCM;
+    if(ptBCM != NULL)
+    {
+        delete ptBCM;
+        ptBCM = NULL;
+    }
     return SUCCESS;
 }
 
@@ -323,7 +333,11 @@ int StateMachine::doActionsForKillSignalEvent()
     // if connection is down then reinitialize all query vectors
     ptBCM->getQueryManagerPointer()->ReInitializeVectors();
     //delete  BrokerConnectionManager Object
-    delete ptBCM;
+    if(ptBCM != NULL)
+    {
+        delete ptBCM;
+        ptBCM = NULL;
+    }
     
     return SIG_KILL_EVENT;
 }
@@ -454,14 +468,17 @@ void StateMachine::processTimerEvent(int signum)
 
 int StateMachine::doActionsForTimerEvent()
 {
-    ptBCM->trackResponseChangesAndSendResponseToMaster(
-                signalHandler);
-    StateMachine::isTimerEvent = false;
-    /* Start a virtual timer. It counts down whenever this process is
-   executing. */
-    if(ptBCM->isConnectionAlive())
+    if(ptBCM != NULL)
     {
-        setitimer (ITIMER_VIRTUAL, &timer, NULL);
+        ptBCM->trackResponseChangesAndSendResponseToMaster(
+                    signalHandler);
+        StateMachine::isTimerEvent = false;
+        /* Start a virtual timer. It counts down whenever this process is
+       executing. */
+        if(ptBCM->isConnectionAlive())
+        {
+            setitimer (ITIMER_VIRTUAL, &timer, NULL);
+        }
     }
 }
 
@@ -471,7 +488,11 @@ void StateMachine::doActionsForConnectionBrokenEvent()
     // if connection is down then reinitialize all query vectors
     ptBCM->getQueryManagerPointer()->ReInitializeVectors();
     //delete  BrokerConnectionManager Object
-    delete ptBCM;
+    if(ptBCM != NULL)
+    {
+        delete ptBCM;
+        ptBCM = NULL;
+    }
     
 }
 
@@ -503,8 +524,7 @@ int StateMachine::Run()
                 }
                 else if(!ptBCM->isConnectionAlive())
                 {
-                    broker::message temp;
-                    extractAndProcessEvents(CONNECTION_BROKEN_EVENT,temp);
+                    break;
                 }
                 // bro events processing 
                 else if(!tempQueue.empty())
@@ -539,9 +559,19 @@ int StateMachine::Run()
        
             }while(ptBCM->isConnectionAlive() &&
                     !signalHandler->gotExitSignal());
-            if(signalHandler->gotExitSignal())
+            //do proper actions against each signal
+            if(!ptBCM->isConnectionAlive())
+            {
+                broker::message temp;
+                extractAndProcessEvents(CONNECTION_BROKEN_EVENT,temp);
+            }
+            else if(signalHandler->gotExitSignal())
             {
                 doActionsForKillSignalEvent();
+            }
+            else
+            {
+                LOG(WARNING) << "Illegal Signal Received in run loop";
             }
             
         }

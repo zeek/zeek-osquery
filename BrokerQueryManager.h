@@ -252,6 +252,15 @@ public:
     void sendErrortoBro(std::string str);
     
     /**
+     * @brief send errors to bro-side before the group topic is not set.
+     * This function is responsible for sending error events to bro-side in 
+     * the form of events.
+     * 
+     * @param str a string containing error message 
+     */
+    void sendErrorBeforeGroupTopic(std::string str);
+    
+    /**
      * @brief send errors to bro-side
      * Sends ready event to bro-side as an ACK message so that bro-side start
      * sending SQL queries. This function is called after group topic is
