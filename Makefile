@@ -2,7 +2,7 @@
  #  Copyright (c) 2015, Next Generation Intelligent Networks (nextGIN), RC.
  #  Institute of Space Technology
  #  All rights reserved.
- #
+ # 
  #  This source code is licensed under the BSD-style license found in the
  #  LICENSE file in the root directory of this source tree. An additional grant
  #  of patent rights can be found in the PATENTS file in the same directory.
@@ -60,7 +60,7 @@ FFLAGS=
 ASFLAGS=
 
 # Link Libraries and Options
-LDLIBSOPTIONS=-L /home/robin/bro/osquery/bro/build/aux/broker -L /home/robin/bro/osquery/osquery/build/21/third-party/glog/lib -lbroker -lboost_thread -lthrift -lboost_system -lcrypto -ldl -lglog -lboost_filesystem -lthriftz -losquery -lgflags -lpthread -lrocksdb_lite -lz -lbz2 -lsnappy
+LDLIBSOPTIONS=-lbroker -lboost_thread -lthrift -lrocksdb -lboost_system -lcrypto -ldl -lglog -lboost_filesystem -lthriftz -losquery
 
 # Build Targets
 
@@ -68,17 +68,17 @@ ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/BrokerQueryManagerPlugin: ${OBJECTFIL
 	${MKDIR} -p ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}
 	${LINK.cc} -o ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/BrokerQueryManagerPlugin.ext ${OBJECTFILES} ${LDLIBSOPTIONS} -s
 
-${OBJECTDIR}/BrokerConnectionManager.o: BrokerConnectionManager.cpp
+${OBJECTDIR}/BrokerConnectionManager.o: BrokerConnectionManager.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
 	$(COMPILE.cc) -g -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/BrokerConnectionManager.o BrokerConnectionManager.cpp
 
-${OBJECTDIR}/BrokerQueryManager.o: BrokerQueryManager.cpp
+${OBJECTDIR}/BrokerQueryManager.o: BrokerQueryManager.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
 	$(COMPILE.cc) -g -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/BrokerQueryManager.o BrokerQueryManager.cpp
 
-${OBJECTDIR}/BrokerQueryPlugin.o: BrokerQueryPlugin.cpp
+${OBJECTDIR}/BrokerQueryPlugin.o: BrokerQueryPlugin.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
 	$(COMPILE.cc) -g -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/BrokerQueryPlugin.o BrokerQueryPlugin.cpp
@@ -88,7 +88,7 @@ ${OBJECTDIR}/StateMachine.o: StateMachine.cpp
 	${RM} "$@.d"
 	$(COMPILE.cc) -O2 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/StateMachine.o StateMachine.cpp
 
-${OBJECTDIR}/utility.o: utility.cpp
+${OBJECTDIR}/utility.o: utility.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
 	$(COMPILE.cc) -g -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/utility.o utility.cpp

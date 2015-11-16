@@ -186,15 +186,7 @@ function send_subscribe_or_unsubscribe(peer_name: string, ev: Event, subscribe: 
 	                           : BrokerComm::event_args(host_unsubscribe, ev_name, ev$query, update_type, init_dump);
 
 	BrokerComm::event(host_topic, ev_args1);
-	init_dump = F;
-
-	if ( add_end_event )
-		{
-		local ev_args2 = subscribe ? BrokerComm::event_args(host_subscribe_end)
-			                   : BrokerComm::event_args(host_unsubscribe_end);
-		
-	        BrokerComm::event(host_topic, ev_args2);
-		}
+	
 	}
 
 function same_event(ev1: Event, ev2: Event) : bool
@@ -263,10 +255,6 @@ function send_subscriptions(ip: addr, peer_name: string)
 
 		send_subscribe_or_unsubscribe(peer_name, s$ev, T, F);
 		}
-
-	local host_topic = fmt("/bro/osquery/host/%s", peer_name);
-	local ev_args = BrokerComm::event_args(host_subscribe_end);
-	BrokerComm::event(host_topic, ev_args);
 	}
 
 function set_host_group(peer_name: string, group: string)

@@ -63,7 +63,7 @@ public:
      * @brief Returns the bool flag indicating whether we received an
      *  exit signal
      * 
-     * @returns Flag indicating shutdown of program
+     * @return Flag indicating shutdown of program
      */
     static bool gotExitSignal();
     

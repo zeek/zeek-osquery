@@ -25,47 +25,47 @@ BrokerConnectionManager::BrokerConnectionManager(std::string hostName,
     //initialize broker API
     broker::init();
     this->bPort = bport;
-    this->connected = false;
+    connected = false;
     //local host object
-    this->ptlocalhost = new broker::endpoint(hostName);
+    ptlocalhost = new broker::endpoint(hostName);
     // broker messages queue
-    this->ptmq = new broker::message_queue(btp,*ptlocalhost);
+    ptmq = new broker::message_queue(btp,*ptlocalhost);
     // pooling for message queue
-    ptpfd = new pollfd{this->ptmq->fd(), POLLIN, 0};
+    ptpfd = new pollfd{ptmq->fd(), POLLIN, 0};
     // Query Manager Object
-    this->qm = new BrokerQueryManager(ptlocalhost,ptmq,btp);
+    qm = new BrokerQueryManager(ptlocalhost,ptmq,btp);
 }
 
 BrokerConnectionManager::~BrokerConnectionManager()
 {
     // query manager object deletion
-    delete this->qm;
+    delete qm;
     //local host object deletion
-    delete this->ptlocalhost;
+    delete ptlocalhost;
     // pooling object linked with message queue deletion
-    delete this->ptpfd;
+    delete ptpfd;
     // message queue deletion
-    delete this->ptmq;
+    delete ptmq;
 }
 
 bool BrokerConnectionManager::connectToMaster(std::string master_ip,
         std::chrono::duration<double> retry_interval, SignalHandler* handler)
 {
     LOG(WARNING) <<"Connecting to Master at "<<master_ip ;
-    this->connected = false;
-    this->peer = ptlocalhost->peer(master_ip,bPort);
+    connected = false;
+    peer = ptlocalhost->peer(master_ip,bPort);
     
     while(!connected && !(handler->gotExitSignal()))
     {
         auto conn_status = 
-        this->ptlocalhost->outgoing_connection_status().want_pop();
+        ptlocalhost->outgoing_connection_status().want_pop();
 
         for(auto cs: conn_status)
         {
             if(cs.status == broker::outgoing_connection_status::tag::established)
             {
                 LOG(WARNING) <<"Connection Established";
-                this->connected = true;
+                connected = true;
                 break;
             }
         }
@@ -76,17 +76,17 @@ bool BrokerConnectionManager::connectToMaster(std::string master_ip,
 int BrokerConnectionManager::getAndSetTopic(std::string gTopic)
 { 
    
-    delete this->ptpfd;
+    delete ptpfd;
     // pooling for message queue
-    ptpfd = new pollfd{this->ptmq->fd(), POLLIN, 0};
-    delete this->qm;
-    this->qm = NULL;
-    this->qm = new BrokerQueryManager(ptlocalhost,ptmq,gTopic);
+    ptpfd = new pollfd{ptmq->fd(), POLLIN, 0};
+    delete qm;
+    qm = NULL;
+    qm = new BrokerQueryManager(ptlocalhost,ptmq,gTopic);
     
     //send ready event to bro-side
     qm->sendReadytoBro();
     
-    return (this->isConnectionAlive())?1:0;
+    return (isConnectionAlive())?1:0;
 }
 
 bool BrokerConnectionManager::processQueriesVectors()
@@ -104,8 +104,8 @@ bool BrokerConnectionManager::processQueriesVectors()
         //send warning to bro.
         qm->sendWarningtoBro("No SQL query Registered... or"
                 " query was unformated");
-        ptlocalhost->unpeer(this->peer);
-        this->connected = false;
+        ptlocalhost->unpeer(peer);
+        connected = false;
         return false;
     }
     // extract event add/removed/both form event part if success
@@ -124,13 +124,11 @@ bool BrokerConnectionManager::processQueriesVectors()
 int BrokerConnectionManager::trackResponseChangesAndSendResponseToMaster(
                     SignalHandler *handle)
 {
-    int local;
     //send a pointer to signal handler object created in main.cpp
     qm->setSignalHandle(handle);
     // start tracking updates
     qm->queriesUpdateTrackingHandler();
-    //check for new subscription messages
-    //local = qm->getLaterSubscriptionEvents(ptpfd,&peer);
+    
     return SUCCESS;
 }
 
@@ -140,7 +138,7 @@ bool BrokerConnectionManager::isConnectionAlive()
 {  
     //check connection queue if there is update
     auto conn_status =
-    this->ptlocalhost->outgoing_connection_status().want_pop();
+    ptlocalhost->outgoing_connection_status().want_pop();
     for(auto cs: conn_status)
     {
         // if connection object found the check if there is disconnect flag
@@ -149,31 +147,30 @@ bool BrokerConnectionManager::isConnectionAlive()
             //if disconnected then break the connection.
             LOG(WARNING) <<"Connection Broken";
             closeBrokerConnection();
-            this->connected = false;
-            //return true;
+            connected = false;
         }
     }
-    return this->connected;
+    return connected;
 }
 
  
 BrokerQueryManager* BrokerConnectionManager::getQueryManagerPointer()
 {
-    return this->qm;
+    return qm;
 }
 
 pollfd* BrokerConnectionManager::getPollfdPointer()
 {
-    return this->ptpfd;
+    return ptpfd;
 }
 
 broker::message_queue* BrokerConnectionManager::getMessageQueuePointer()
 {
- return this->ptmq;   
+    return ptmq;   
 }
 
 void BrokerConnectionManager::closeBrokerConnection()
 {
-    ptlocalhost->unpeer(this->peer);
-	this->connected = false;
+    ptlocalhost->unpeer(peer);
+    connected = false;
 }

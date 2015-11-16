@@ -29,8 +29,7 @@
 using namespace osquery;
 
 /**
- * @brief Incoming broker-events information Structure	
- *
+ * @brief Incoming broker-events information Structure.
  * It will hold Bro's query subscription function information 
  */
 struct input_query
@@ -64,6 +63,7 @@ struct query_update
  *  @brief Stores columns names extracted from query string
  *  
  */
+
 //vector of query columns
 typedef std::vector<std::string> query_columns;
 
@@ -79,8 +79,8 @@ const int PTIME = 2000;
  *  @brief Query Manager is responsible for update tracking for given queries
  * 
  *  When broker connection is establish then control is handled to 
- *  BrokerQueryManager.
- *  Then it keeps tracking updates and sends update events to Bro-side
+ *  BrokerQueryManager. Then it keeps tracking updates and sends update events
+ *  to Bro-side
  */
 class BrokerQueryManager
 {
@@ -100,16 +100,13 @@ private:
     std::vector<query_update> out_query_vector;
     //vector of input_query
     std::vector<input_query> in_query_vector;
-    
     // Bro events name vector 
     std::vector<std::string> event;
-    
     // query colum vector object
     query_columns qc;
-    
     // query columns map object for storing each query columns
     query_columns_map qmap;
-    //to track the CTRL +C kill signal
+    // to track the CTRL +C kill signal
     SignalHandler *handle;
     
 public:
@@ -127,29 +124,29 @@ public:
     
     
     /**    
-     *  @brief Extracts update type form Events received   
-     *  
-     *  Checks the interested event whether "added" or "removed"
+     *  @brief Extracts update type from bro events (broker::message) received.    
+     *  It maps the interested event type whether "ADD", "REMOVED" or "BOTH" 
+     *  with the subscribed SQL query.
      * 
-     *  @return returns true if some data is written in vector 
+     *  @return returns true if some data is written in local event vector 
      */
     bool getEventsFromBrokerMessage();
     
     /**    
-     *  @brief Extracts query columns from query 
-     * 
-     *  Builds column structure by extracting column name form query string.
+     *  @brief Extracts query columns from SQL query.
+     *  Builds column structure by extracting column name for each corresponding
+     *  query string.
      *  
      *  @return returns true if extraction is successful 
      */
     bool queryColumnExtractor();
     
     /**    
-     *  @brief Makes the out_query_vector with given queries results
-     *  
-     *  This function need to be called when connection builds  
+     *  @brief Fills the out_query_vector with given queries initial results. 
+     *  This function need to be called after each query subscription message 
+     *  for initializing out_query_vectors.   
      * 
-     *  @returns True if out_query_vector is initialized properly
+     *  @return True if out_query_vector is initialized properly
      */
     bool queryDataResultVectorInit();
     
@@ -164,17 +161,18 @@ public:
     
     
     /**
-     *  @brief Returns SQL query results in QueryData structure
+     *  @brief A wrapper function to get daemon state against input SQL query. 
      * 
      *  @param queryString SQL formated string to get host-level information
      *
-     *  @return Query results in the form of osquery::QueryData
+     *  @return Query results in the form of osquery::QueryData.
      */ 
     QueryData getQueryResult(const std::string& queryString);
     
     /**    
      *  @brief Calculates difference in query results; if there is any update
-     *  Row added or removed then it triggers sendUpdateEventToMaster().
+     *  (row added or removed) then it triggers sendUpdateEventToMaster() to 
+     *  send updates to bro-side.
      * 
      *  @param iterator to indicate query for which we need to calculate
      *  difference.
@@ -182,7 +180,7 @@ public:
     void diffResultsAndEventTriger(int& i);
     
    /**    
-    *  @brief Sends update response to master
+    * @brief Sends update events to master in the form of broker::messages
     *
     * @param temp QueryData that holds update information whether added
     *  or removed
@@ -193,9 +191,9 @@ public:
         int& iterator);
     
     /**
-    * @brief Extracts event name and SQL query form Broker Message
-    * 
-    * Trims, Extracts and formulate input_query structure from broker Message
+    * @brief Extracts event name, type and SQL query form Broker Message.
+    * Processes the input broker::message and builds an input_query structure
+    * from broker message.
     * 
     * @param msg broker::message received in event form
     *
@@ -230,62 +228,72 @@ public:
              
     
     /**
-     *  @brief returns the pointer to signalHandler object
-     *  @param s_handle pointer to signal handler 
+     *  @brief This function is used to set signal handler pointer 
+     *  @param s_handle pointer to signal handler object created in main.cpp
      */
     void setSignalHandle(SignalHandler *s_handle);
     
     /**
      * @brief send warnings to bro-side
-     * This function is responsible for sending warning events to bro side
+     * This function is responsible for sending warning events to bro side in 
+     * the form of events.
      * 
-     * @param str warning message 
+     * @param str a string containing warning message 
      */
     void sendWarningtoBro(std::string str);
     
     /**
      * @brief send errors to bro-side
-     * This function is responsible for sending error events to bro-side
+     * This function is responsible for sending error events to bro-side in 
+     * the form of events.
      * 
-     * @param str error message 
+     * @param str a string containing error message 
      */
     void sendErrortoBro(std::string str);
     
     /**
      * @brief send errors to bro-side
-     *  Sends ready event to bro side as an ACK message so that bro-side start
-     *  sending SQL queries
+     * Sends ready event to bro-side as an ACK message so that bro-side start
+     * sending SQL queries. This function is called after group topic is
+     * registered.
      * 
      */
     void sendReadytoBro();
     
     /**
-     * @brief SQL query formating checking
+     * @brief SQL query formate checking. It simply checks whether SELECT and  
+     * FROM keywords are in upper case. If not then it transforms them to upper
+     * case. The rest of formating is checked by osquery itself. If osquery
+     * could not process any query then it will generate an error message. Which 
+     * can be sent to bro-side.
      * 
      * @param str SQL query string
-     * @return return formated SQL string
+     * @return returns formated SQL string
      */
     std::string formateSqlString(std::string str);
     
     /**
-     * @brief update all vectors/map accordingly
+     * @brief If the SQL query is not registered before then it pushes the new
+     * query to in_query_vector.
      * 
      * @param in input_query vector to broker
-     * @return return ture if operation is successful
+     * @return returns ture if operation is successful
      */
     bool addNewQueries(input_query in);
     
     /**
-     * @brief remove corresponding entries form vectors/map  
+     * @brief If the SQL query is already registered before then it deleted the 
+     * provided query from in_query_vector.
      * 
      * @param in input_query vector to broker
-     * @return return ture if operation is successful
+     * @return returns ture if operation is successful
      */
     bool deleteOldQueries(input_query in);
     
     /**
      * @brief To check the status of in_query_vector whether empty or not 
-     * @return return ture if the in_query_vector is not empty 
+     * 
+     * @return returns ture if the in_query_vector is not empty 
      */
     bool getInQueryVectorStatus();   
 };

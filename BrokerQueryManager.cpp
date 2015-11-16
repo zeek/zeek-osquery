@@ -17,15 +17,14 @@ BrokerQueryManager::BrokerQueryManager(broker::endpoint* lhost,
         broker::message_queue* mq,std::string btp)
 {
     //point to broker topic object
-    this->bTopic = btp;
-    this->firstTime = true;
+    bTopic = btp;
+    firstTime = true;
     //point to local host object
-    this->ptlocalhost = lhost;
+    ptlocalhost = lhost;
     //pointer to message queue object
-    this->ptmq = mq;
-    getlogin_r(this->username,SIZE);
+    ptmq = mq;
+    getlogin_r(username,SIZE);
 }
-
 
 
 bool BrokerQueryManager::getEventsFromBrokerMessage()
@@ -44,6 +43,7 @@ bool BrokerQueryManager::getEventsFromBrokerMessage()
 
 bool BrokerQueryManager::queryColumnExtractor()
 {
+    LOG(WARNING) << "Current Queries";
     if(!qmap.empty())
     {
         qmap.clear();
@@ -92,11 +92,11 @@ bool BrokerQueryManager::queryDataResultVectorInit()
         }
         temp.old_results = temp.current_results;
         temp.current_results.clear();
-        // 0.5sec delay
-        usleep(500000);
+        // 0.1sec delay
+        usleep(100000);
         temp.current_results = getQueryResult(in_query_vector[i].query);
         out_query_vector.emplace_back(temp);
-        this->firstTime = false;
+        firstTime = false;
     }
     LOG(WARNING) <<"Sending Updates...";
     return (!out_query_vector.empty()) ? true: false;
@@ -125,8 +125,6 @@ QueryData BrokerQueryManager::getQueryResult(const std::string& queryString)
 
 void BrokerQueryManager::diffResultsAndEventTriger(int& i)
 {
-    //After each 1sec daemon will query
-    //usleep(1000000);
     out_query_vector[i].current_results =
             getQueryResult(in_query_vector[i].query);
 
@@ -188,11 +186,11 @@ void BrokerQueryManager::sendUpdateEventToMaster(const QueryData& temp,
                 }
             }
             //send broker message
-        LOG(WARNING) << msg;
-        this->ptlocalhost->send(bTopic, msg);
-        msg.clear();
+            LOG(WARNING) << msg;
+            ptlocalhost->send(bTopic, msg);
+            msg.clear();
         }
-        this->ptmq->want_pop().clear();
+        ptmq->want_pop().clear();
     }
 }
 
@@ -229,7 +227,7 @@ const broker::message& msg)
     //will throw an exception if query is not a proper SQL string
     if(temp.query.substr(0,6)!= "SELECT")
     {
-        this->sendErrortoBro("Please send Proper query");
+        sendErrortoBro("Please send Proper query");
         throw(std::string("Please send Proper formated query"));
     }
     else
@@ -354,7 +352,7 @@ bool BrokerQueryManager::addNewQueries(input_query in)
     } 
    else
    {
-       this->sendErrortoBro(in.query + " is already registered");
+       sendErrortoBro(in.query + " is already registered");
        return false;
    }
     
@@ -377,7 +375,7 @@ bool BrokerQueryManager::deleteOldQueries(input_query in)
     //if not found
    if (loc == in_query_vector.size())
     {
-       this->sendErrortoBro(in.query + " is unregistered");
+       sendErrortoBro(in.query + " is unregistered");
        return false;
     } 
    else

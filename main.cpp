@@ -43,23 +43,22 @@ int main(int argc, char* argv[]) {
   
     //SignalHandler object to trace kill signal
   SignalHandler *signalHandler = new SignalHandler;
-  //To start the program form INIT state.
-  currentState = INIT;
+  
   try
     {
       // try setting up signal handler for kill signal
       signalHandler->setupSignalHandler();
       //StateMachine object
-      StateMachine smObj(signalHandler);
+      StateMachine stateMachineObj(signalHandler);
       //run the state machine
-      int statusCode = smObj.Run();
-      
+      int statusCode = stateMachineObj.Run();
+
       if(statusCode == SUCCESS)
       {
         // delete SignalHandler object 
         delete signalHandler;
       }
-     }
+    }
   // catches exception thrown at kill signal setup time
     catch(SignalException& e)
     {

@@ -8,13 +8,13 @@ export {
 	type Info: record {
 		t: time &log;
 		host: string &log;
-		pid: count &log;
-		ppid: count &log;
+		pid: int &log;
+		ppid: int &log;
 		path: string &log;
-		uid: count &log;
-		euid: count &log;
-		gid: count &log;
-		egid: count &log;
+		uid: int &log;
+		euid: int &log;
+		gid: int &log;
+		egid: int &log;
 		argv: string &log;
 	};
 }
@@ -30,13 +30,13 @@ event processes(host: string, utype: string,
 	local info: Info = [
 			    $t=network_time(),
 			    $host=host,
-			    $pid = int_to_count(pid),
-			    $ppid = int_to_count(parent),
+			    $pid = pid,
+			    $ppid = parent,
 			    $path = path,
-			    $uid = int_to_count(uid),
-			    $euid = int_to_count(euid),
-			    $gid = int_to_count(gid),
-			    $egid = int_to_count(euid),
+			    $uid = uid,
+			    $euid = euid,
+			    $gid = gid,
+			    $egid = euid,
 			    $argv = cmdline
 			   ];
 	

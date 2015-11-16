@@ -11,6 +11,8 @@
 #include "StateMachine.h"
 
 bool StateMachine::isTimerEvent = false;
+Event StateMachine::currentEvent = ILLEGAL_EVENT;
+State StateMachine::currentState = INIT;
 
 StateMachine::StateMachine(SignalHandler* handler)
 {
@@ -36,19 +38,19 @@ int StateMachine::initializeStateMachine()
     //set currentState to INIT at start
     currentState = INIT;
     //Reads hostName, broker_topic and broker_port form broker.ini file
-     fileResponse = fileReader.read();
-     // if reading is not successful
-     if (fileResponse != 0)
-     {
-         return  KILL_SIGNAL;
-     }
+    fileResponse = fileReader.read();
+    // if reading is not successful
+    if (fileResponse != 0)
+    {
+        return  KILL_SIGNAL;
+    }
      
-     //initialize the timer with timer_interval after reading broker.ini
-     timerInterval = std::atoi(fileReader.getTimerInterval().c_str());
-     setupTimerInterval(timerInterval);
+    //initialize the timer with timer_interval after reading broker.ini
+    timerInterval = std::atoi(fileReader.getTimerInterval().c_str());
+    setupTimerInterval(timerInterval);
      
-     // if reading is successful
-     // then make a broker connection manager object
+    // if reading is successful
+    // then make a broker connection manager object
     ptBCM = new BrokerConnectionManager(getLocalHostIp(),
         fileReader.getBrokerTopic(),
         std::atoi(fileReader.getBrokerConnectionPort().c_str()));
@@ -202,19 +204,9 @@ int StateMachine::processEventsInGetAndProcessQueriesState(int ev,
             doActionsForHostSubscribeEvent(msg);
             break;
         }
-        case HOST_SUBSCRIBE_END_EVENT:
-        {
-            statusCode = doActionsForHostSubscribeEndEvent();
-            break;
-        }
         case HOST_UNSUBSCRIBE_EVENT:
         {
             doActionsForHostUnSubscribeEvent(msg);
-            break;
-        }
-        case HOST_UNSUBSCRIBE_END_EVENT:
-        {
-            doActionsForHostUnSubscribeEndEvent();
             break;
         }
         case CONNECTION_BROKEN_EVENT:
@@ -242,6 +234,7 @@ int StateMachine::processEventsInGetAndProcessQueriesState(int ev,
 
 int StateMachine::doActionsForHostSubscribeEvent(broker::message msg)
 {
+    int statusCode=FAILURE;
     //temporary variable for input queries
     input_query inString;
     try
@@ -250,6 +243,8 @@ int StateMachine::doActionsForHostSubscribeEvent(broker::message msg)
         inString = ptBCM->getQueryManagerPointer()->brokerMessageExtractor(msg);
         //if extraction is successful then add that query to local query vector
         ptBCM->getQueryManagerPointer()->addNewQueries(inString);
+        //process queries
+        statusCode = processMasterQuery();
         
     }
     catch(std::string e)
@@ -259,7 +254,7 @@ int StateMachine::doActionsForHostSubscribeEvent(broker::message msg)
     return SUCCESS;
 }
 
-int StateMachine::doActionsForHostSubscribeEndEvent()
+int StateMachine::processMasterQuery()
 {
     int statusCode;
     statusCode = ptBCM->processQueriesVectors();
@@ -284,14 +279,19 @@ int StateMachine::doActionsForHostSubscribeEndEvent()
 
 int StateMachine::doActionsForHostUnSubscribeEvent(broker::message msg)
 {
+    int statusCode = FAILURE;
     input_query inString;
     try
     {
         //try extracting broker::message
         inString = ptBCM->getQueryManagerPointer()->brokerMessageExtractor(msg);
         //if that query already exists then delete it.
-        ptBCM->getQueryManagerPointer()->deleteOldQueries(inString);
-        
+        bool tm = ptBCM->getQueryManagerPointer()->deleteOldQueries(inString);
+        //process queries
+        if(tm)
+        {
+            statusCode = processMasterQuery();
+        }
     }
     catch(std::string e)
     {
@@ -300,11 +300,6 @@ int StateMachine::doActionsForHostUnSubscribeEvent(broker::message msg)
     return SUCCESS;
 }
 
-int StateMachine::doActionsForHostUnSubscribeEndEvent()
-{
-    int statusCode = doActionsForHostSubscribeEndEvent();
-    return statusCode;
-}
 
 int StateMachine::processEventsInTerminateState()
 {
@@ -383,17 +378,9 @@ int StateMachine::stringToEvent(std::string in)
     {
         return HOST_SUBSCRIBE_EVENT;
     }
-    else if(in == "osquery::host_subscribe_end")
-    {
-        return HOST_SUBSCRIBE_END_EVENT;
-    }
     else if(in == "osquery::host_unsubscribe")
     {
         return HOST_UNSUBSCRIBE_EVENT;
-    }
-    else if(in == "osquery::host_unsubscribe_end")
-    {
-        return HOST_UNSUBSCRIBE_END_EVENT;
     }
     else if(in == "CONNECTION_BROKEN_EVENT")
     {
@@ -425,17 +412,9 @@ std::string StateMachine::eventToString(int ev)
         {
             return "HOST_SUBSCRIBE_EVENT";
         }
-        case HOST_SUBSCRIBE_END_EVENT:
-        {
-            return "HOST_SUBSCRIBE_END_EVENT";
-        }
         case HOST_UNSUBSCRIBE_EVENT:
         {
             return "HOST_UNSUBSCRIBE_EVENT";
-        }
-        case HOST_UNSUBSCRIBE_END_EVENT:
-        {
-            return "HOST_UNSUBSCRIBE_END_EVENT";
         }
         default:
         {
@@ -447,10 +426,10 @@ std::string StateMachine::eventToString(int ev)
 void StateMachine::setupTimerInterval(int interval)
 {
     /* Configure the timer to expire after interval msec... */
-     timer.it_value.tv_sec = 0;
-     timer.it_value.tv_usec = interval;
-     timer.it_interval.tv_sec = 0;
-     timer.it_interval.tv_usec = 0;     
+    timer.it_value.tv_sec = 0;
+    timer.it_value.tv_usec = interval;
+    timer.it_interval.tv_sec = 0;
+    timer.it_interval.tv_usec = 0;     
 }
 
 void StateMachine::initializeTimer()
@@ -477,10 +456,13 @@ int StateMachine::doActionsForTimerEvent()
 {
     ptBCM->trackResponseChangesAndSendResponseToMaster(
                 signalHandler);
-        StateMachine::isTimerEvent = false;
-        /* Start a virtual timer. It counts down whenever this process is
-       executing. */
-       setitimer (ITIMER_VIRTUAL, &timer, NULL);
+    StateMachine::isTimerEvent = false;
+    /* Start a virtual timer. It counts down whenever this process is
+   executing. */
+    if(ptBCM->isConnectionAlive())
+    {
+        setitimer (ITIMER_VIRTUAL, &timer, NULL);
+    }
 }
 
 
@@ -496,16 +478,20 @@ void StateMachine::doActionsForConnectionBrokenEvent()
 int StateMachine::Run()
 {   
     int statusCode = 0;
+    // Run the program until SIG_KILL is not received
     do
     {
         StateMachine::isTimerEvent = false;
         //initialize the state machine
         statusCode = initializeStateMachine();
+        //set next state
         setNextState(statusCode);
         if(statusCode == SUCCESS)
         {
+            // Run the program until connection is alive.
             do 
             {
+                // poll for bro events.
                 PollData tempQueue = waitForEvents();
                 if(signalHandler->gotExitSignal())
                 {
@@ -520,11 +506,7 @@ int StateMachine::Run()
                     broker::message temp;
                     extractAndProcessEvents(CONNECTION_BROKEN_EVENT,temp);
                 }
-                else if(isTimerEvent)
-                {
-                    broker::message temp;
-                    extractAndProcessEvents(TIMER_EVENT,temp);
-                }
+                // bro events processing 
                 else if(!tempQueue.empty())
                 {
                     for(auto& msg : tempQueue)
@@ -547,6 +529,7 @@ int StateMachine::Run()
                         }
                     }
                 }
+                // if timer is up.
                 else if(isTimerEvent)
                 {
                     broker::message temp;

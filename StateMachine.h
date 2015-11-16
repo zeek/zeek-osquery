@@ -9,33 +9,6 @@
  *
  */
 
-/*State Machine Table:
-
-       |PARAM_READ_   |CONNECTION  |TOPIC_RECEIVED |HOST        |HOST_SUBSCRIBE |HOST	      |HOST	    |SIG	 |CONNECTION   |TIMER       |
-       |EVENT         |_ESTABLISHED|	           |_SUBSCRIBE  |_END	        |_UNSUBSCRIBE |_UNSUBSCRIBE |_KILL	 |_BROKEN      |_EVENT      |
-       |	      |            |	           |            |	        |	      |_END	    |	         |	       |	    |
--------|--------------|------------|---------------|------------|---------------|-------------|-------------|------------|-------------|------------|
-INIT   |pass control  |N-S--->WAIT_|illegitmate    |illegitimate|illegitmate    |illegitmate  |illegitmate  |free the    |free the     |stop-timer  |
-       |to connection |_FOR_TOPIC  |event	   |event       |event	        |event	      |event	    |resources   |resources    |	    |
-       |establishment |            |	           |            |		|	      |	            |and exit    |N-S----->INIT|	    |
-       |	      |            |	           |            |		|	      |	            |gracefully  |	       |	    |
------- |--------------|------------|---------------|------------|---------------|-------------|-------------|------------|-------------|------------|
-WAIT   |illegitimate  |illegitimate|extract and    |send warning|send_warning   |send_warning |send_warning |illegitimate|illegitimate |illegitimate|	
-_FOR   |event         |event       |process topic  |to Broside  |to Broside	|to Broside   |to Broside   |event	 |event	       |event       |
-_TOPIC |	      |            |N-S-->GET_AND_ |            |		|	      |	            |	         |	       |	    |
-       |	      |            |PROCESS_QUERIES|            |		|	      |	            |	         |	       |	    |
--------|--------------|------------|---------------|------------|---------------|-------------|-------------|------------|-------------|------------|
-GET    |illegitmate   |illegitmate |send warning   |add new     |process queries|delete given |process 	    |illegitimate|illegitmate  |track       |
-_AND_  |event         |event       |to Bro-side    |query to    |and build 	|sql query    |queries and  |event	 |event	       |changes     |
-PROCESS|	      |            |	           |local vector| vector	|from local   |build vector |	         |	       |and send    |
-_QUER  |	      |            |	           |            |with updated   |vector	      |with updated |	         |	       |updates     |
-IES    |	      |            |	           |            |values	        |	      |values	    |	         |	       |to Broside  |
--------|--------------|------------|---------------|------------|---------------|-------------|-------------|------------|-------------|------------|
-TERMI- |illegitimate  |illegitimate|illegitmate    |illegitimate|illegitimate   |illegitimate |illegitimate |illegitimate|illegitimate |illegitimate|
-NATE   |event         |event	   |event	   |event	|event	        | event	      |event	    |event	 |event	       |event       |
-
-*/
-
 #pragma once
 
 
@@ -82,18 +55,47 @@ NATE   |event         |event	   |event	   |event	|event	        | event	      |e
  */
 
 
+/*State Machine Table:
+N-S = Next State
+illegimate event action --> ignore them 
+Y-axis --> States
+X-axis --> Possible Events
+
+       |PARAM_READ_   |CONNECTION  |TOPIC_RECEIVED |HOST        |HOST	      |SIG	   |CONNECTION   |TIMER       |
+       |EVENT         |_ESTABLISHED|	           |_SUBSCRIBE  |_UNSUBSCRIBE |_KILL       |_BROKEN      |_EVENT      |
+       |	      |            |	           |            |	      |	           |	         |	      |
+-------|--------------|------------|---------------|------------|-------------|------------|-------------|------------|
+INIT   |pass control  |N-S--->WAIT_|illegitmate    |illegitimate|illegitmate  |free the    |free the     |stop-timer  |
+       |to connection |_FOR_TOPIC  |event	   |event       |event	      |resources   |resources    |	      |
+       |establishment |            |	           |            |	      |and exit    |N-S----->INIT|	      |
+       |	      |            |	           |            |	      |gracefully  |	         |	      |
+------ |--------------|------------|---------------|------------|-------------|------------|-------------|------------|
+WAIT   |illegitimate  |illegitimate|extract and    |send warning|send_warning |            |free the     |illegitimate|	
+_FOR   |event         |event       |process topic  |to Broside  |to Broside   |  --do--	   |resources	 |event       |
+_TOPIC |	      |            |N-S-->GET_AND_ |            |	      |	           |	         |            |
+       |	      |            |PROCESS_QUERIES|            |	      |	           |N-S----->INIT|stop-timer  |
+-------|--------------|------------|---------------|------------|-------------|------------|-------------|------------|
+GET    |illegitmate   |illegitmate |send warning   |add new     |delete given |            |free the     |track       |
+_AND_  |event         |event       |to Bro-side    |query to    |sql query    |  	   |resources	 |changes     |
+PROCESS|	      |            |	           |local vector|from local   |	 --do--    |	         |and send    |
+_QUER  |	      |            |	           |and process |vector and   |	           |N-S----->INIT|updates     |
+IES    |	      |            |	           |            |process      |	           |	         |to Broside  |
+-------|--------------|------------|---------------|------------|-------------|------------|-------------|------------|
+TERMI- |illegitimate  |illegitimate|illegitmate    |illegitimate|illegitimate |illegitimate|illegitimate |illegitimate|
+NATE   |event         |event	   |event	   |event	| event	      |event	   |event	 |event       |
+
+*/
+
+
+
 enum State {INIT, WAIT_FOR_TOPIC,GET_AND_PROCESS_QUERIES,TERMINATE};
 
 enum Event {TIMER_EVENT,CONNECTION_ESTABLISHED_EVENT,CONNECTION_BROKEN_EVENT, 
             SIG_KILL_EVENT, PARAM_READ_EVENT, TOPIC_RECEIVED_EVENT, 
-            HOST_SUBSCRIBE_EVENT, HOST_SUBSCRIBE_END_EVENT,
-            HOST_UNSUBSCRIBE_EVENT, HOST_UNSUBSCRIBE_END_EVENT, ILLEGAL_EVENT
+            HOST_SUBSCRIBE_EVENT, HOST_UNSUBSCRIBE_EVENT, ILLEGAL_EVENT
             };
-// To hold the current state
-static State currentState;
- //To hold the event 
-static Event currentEvent;
-
+            
+//broker::queue data type
 typedef std::deque<std::vector<broker::data>,
         std::allocator<std::vector<broker::data> > > PollData;
 
@@ -117,6 +119,10 @@ private:
   struct itimerval timer;
   //variable to check if timer has expired or has not
   static bool isTimerEvent;
+  //To hold the event 
+  static Event currentEvent;
+  //To hold the current state
+  static State currentState;
   //SignalHandler object to trace kill signal
   SignalHandler *signalHandler;
   // BrokerConnectionManager class pointer
@@ -144,10 +150,11 @@ private:
     PollData waitForEvents();
     
     /**
-     * @brief This function extracts event type from broker::message of
-     * broker message queue and then passes that event for further processing
+     * @brief This function extracts event type from "broker::message" of
+     * "broker::message_queue" and then passes that event for further processing
+     * 
      * @param event represents the events received (local or remote) after 
-     * polling process extracts the message form queue of broker::message.
+     * polling process extracts the message form queue of "broker::message".
      * @param msg broker::message received during polling process
      * 
      * @return returns status code. It can be KILL_SIGNAL, SUCCESS or FAILURE
@@ -158,6 +165,7 @@ private:
      * @brief To process the actions based on an event type in WAIT_FOR_TOPIC 
      * state. In this state kill signal and wait_for_topic are
      * allowed events all other are illegal events.
+     * 
      * @return returns status code. It can be KILL_SIGNAL, SUCCESS or FAILURE
      */
     int processEventsInWaitForTopicState(int event,broker::message msg);
@@ -188,12 +196,12 @@ private:
     int doActionsForHostSubscribeEvent(broker::message msg);
     
     /**
-     * @brief performs the required actions after "host subscribe end" event
+     * @brief updates the internal vectors with updated queries.
      * The main actions are to process received queries and initialize vectors
      * with corresponding data.
      * @return returns status code. It can be KILL_SIGNAL, SUCCESS or FAILURE
      */
-    int doActionsForHostSubscribeEndEvent();
+    int processMasterQuery();
     
     /**
      * @brief performs the required actions after "host subscribe end" event is 
@@ -203,16 +211,6 @@ private:
      */
     int doActionsForHostUnSubscribeEvent(broker::message msg);
     
-    /**
-     * @brief performs the required actions after "host un-subscribe end" event
-     * The main actions are to process received queries and initialize vectors
-     * with corresponding data.
-     * 
-     * TODO: subscription and un-subscription end event might be same in future
-     * 
-     * @return returns status code. It can be KILL_SIGNAL, SUCCESS or FAILURE
-     */
-    int doActionsForHostUnSubscribeEndEvent();
     
     /**
      * @brief To process the actions in TERMINATE state.
@@ -223,8 +221,9 @@ private:
     int processEventsInTerminateState();
     
     /**
-     * @brief performs the required actions after "kill signal event" is received
+     * @brief performs the required actions after "SIG_KILL event" is received.
      * It will clean up the occupied resources.
+     * 
      * @return returns status code. It can be KILL_SIGNAL, SUCCESS or FAILURE
      */
     int doActionsForKillSignalEvent();
@@ -294,7 +293,7 @@ public:
     
     /**
      * @brief Constructor 
-     * To Initialize private member for safe usages
+     * To Initialize class fields for safe usages
      * 
      * @param signalHandler pointer to signal handler object created in main()
      */
