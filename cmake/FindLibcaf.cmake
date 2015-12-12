@@ -20,7 +20,7 @@
 #  LIBCAF_INCLUDE_DIR_$C     Include path for component $C
 
 find_path(LIBCAF_ROOT_DIR
-    NAMES broker/broker.hh
+    NAMES include/caf/all.hpp
 )
 
 # iterate over user-defined components
@@ -40,13 +40,13 @@ foreach (comp ${Libcaf_FIND_COMPONENTS})
   find_path(LIBCAF_INCLUDE_DIR_${UPPERCOMP}
             NAMES
               ${HDRNAME}
-            HINTS
+            PATHS
               ${LIBCAF_ROOT_DIR}/include
+              ${CMAKE_INSTALL_PREFIX}/include
               /usr/include
               /usr/local/include
               /opt/local/include
               /sw/include
-              ${CMAKE_INSTALL_PREFIX}/include
               ../${HDRHINT}
               ../../${HDRHINT}
               ../../../${HDRHINT})
@@ -70,13 +70,13 @@ foreach (comp ${Libcaf_FIND_COMPONENTS})
   find_library(LIBCAF_LIBRARY_${UPPERCOMP}
                NAMES
                  "caf_${comp}"
-               HINTS
+               PATHS
                  ${LIBCAF_ROOT_DIR}/lib
+                 ${CMAKE_INSTALL_PREFIX}/lib
                  /usr/lib
                  /usr/local/lib
                  /opt/local/lib
                  /sw/lib
-                 ${CMAKE_INSTALL_PREFIX}/lib
                  ../actor-framework/build/lib
                  ../../actor-framework/build/lib
                  ../../../actor-framework/build/lib)

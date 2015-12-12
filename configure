@@ -35,6 +35,7 @@ Usage: $0 [OPTION]... [VAR=VALUE]...
 
   Required Packages in Non-Standard Locations:
     --with-broker=PATH     path to Broker installation
+    --with-caf=PATH        path to CAF installation
     --with-osquery=PATH    path to osquery installation
 
   Influential Environment Variables (only on first invocation
@@ -61,6 +62,7 @@ builddir=build
 prefix=/usr/local
 CMakeCacheEntries=""
 append_cache_entry CMAKE_INSTALL_PREFIX PATH     $prefix
+append_cache_entry BRO_HOST             STRING   "127.0.0.1"
 
 # parse arguments
 while [ $# -ne 0 ]; do
@@ -81,6 +83,9 @@ while [ $# -ne 0 ]; do
             prefix=$optarg
             append_cache_entry CMAKE_INSTALL_PREFIX PATH   $optarg
             ;;
+        --bro-host=*)
+            append_cache_entry BRO_HOST             STRING $optarg
+            ;;
         --build-type=*)
             append_cache_entry CMAKE_BUILD_TYPE     STRING $optarg
             ;;
@@ -89,6 +94,9 @@ while [ $# -ne 0 ]; do
             ;;
         --with-broker=*)
             append_cache_entry BROKER_ROOT_DIR      PATH   $optarg
+            ;;
+        --with-caf=*)
+            append_cache_entry LIBCAF_ROOT_DIR      PATH   $optarg
             ;;
         --with-osquery=*)
             append_cache_entry OSQUERY_ROOT_DIR     PATH   $optarg
@@ -116,7 +124,14 @@ fi
 echo "Build Directory : $builddir"
 echo "Source Directory: $sourcedir"
 cd $builddir
-cmake $CMakeCacheEntries $sourcedir
+
+echo $CMakeCacheEntries 
+
+if [ -n "$CMakeGenerator" ]; then
+    cmake -G "$CMakeGenerator" $CMakeCacheEntries $sourcedir
+else
+    cmake $CMakeCacheEntries $sourcedir
+fi
 
 echo "# This is the command used to configure this build" > config.status
 echo $command >> config.status

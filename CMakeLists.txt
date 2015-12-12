@@ -16,6 +16,7 @@ find_package(Glog REQUIRED)
 include_directories(BEFORE ${BROKER_INCLUDE_DIRS})
 include_directories(BEFORE ${OSQUERY_INCLUDE_DIRS})
 include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+include_directories(BEFORE ${CMAKE_BINARY_DIR}/src)
 
 set(LINK_LIBS ${LINK_LIBS} ${LIBCAF_LIBRARIES} ${BROKER_LIBRARY} ${OSQUERY_LIBRARY} ${GLOG_LIBRARY})
 
@@ -49,15 +50,31 @@ set(SRCS
     src/utility.cpp
 )
 
+set(BROKER_INI_PATH "${CMAKE_INSTALL_PREFIX}/etc/broker.ini")
+
+configure_file(${CMAKE_SOURCE_DIR}/src/config.h.in ${CMAKE_BINARY_DIR}/src/config.h)
+configure_file(${CMAKE_SOURCE_DIR}/etc/broker.ini.in ${CMAKE_BINARY_DIR}/etc/broker.ini)
+configure_file(${CMAKE_SOURCE_DIR}/etc/bro.load.in ${CMAKE_BINARY_DIR}/etc/bro.load)
+
+SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
 add_executable(${TARGET} ${SRCS})
 target_link_libraries(${TARGET} ${LINK_LIBS})
 set_target_properties(${TARGET} PROPERTIES OUTPUT_NAME "${TARGET}.ext")
+#set_target_properties(${TARGET} PROPERTIES INSTALL_RPATH ${BROKER_ROOT_DIR}/lib)
+#set_target_properties(${TARGET} PROPERTIES INSTALL_RPATH ${LIBCAF_ROOT_DIR}/lib)
+
+install(FILES ${CMAKE_BINARY_DIR}/etc/broker.ini DESTINATION etc)
+install(FILES ${CMAKE_BINARY_DIR}/etc/bro.load DESTINATION etc/osquery)
+install(TARGETS ${TARGET} RUNTIME DESTINATION lib/osquery/extensions)
 
 message(
-    "\n==================|  broker Config Summary  |===================="
+    "\n==================|  Bro-Osquery Config Summary  |===================="
     "\nInstall prefix:  ${CMAKE_INSTALL_PREFIX}"
-    "\nBroker prefix:   ${BROKER_ROOT}"
-    "\nOsquery prefix:  ${OSQUERY_ROOT}"
+    "\nBroker prefix:   ${BROKER_ROOT_DIR}"
+    "\nCAF prefix:      ${LIBCAF_ROOT_DIR}"
+    "\nOsquery prefix:  ${OSQUERY_ROOT_DIR}"
+    "\nBro host:        ${BRO_HOST}"
     "\n"
     "\nLink libraries:  ${LINK_LIBS}"
     "\nCC:              ${CMAKE_C_COMPILER}"

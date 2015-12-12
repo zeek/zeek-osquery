@@ -17,18 +17,18 @@
 #  BROKER_LIBRARY           The Broker library/libraries
 #  BROKER_INCLUDE_DIR       The location of Broker headers
 
-find_path(BROKER_ROOT
-    NAMES broker/broker.hh
+find_path(BROKER_ROOT_DIR
+    NAMES include/broker/broker.hh broker/broker.hh
 )
 
 find_library(BROKER_LIBRARY
     NAMES broker
-    HINTS ${BROKER_ROOT}/build ${BROKER_ROOT}/lib
+    HINTS ${BROKER_ROOT_DIR}/build ${BROKER_ROOT_DIR}/lib
 )
 
 find_path(BROKER_INCLUDE_DIR
     NAMES broker/broker.hh
-    HINTS ${BROKER_ROOT}/ ${BROKER_ROOT}/include
+    HINTS ${BROKER_ROOT_DIR}/ ${BROKER_ROOT_DIR}/include
 )
 
 include(FindPackageHandleStandardArgs)

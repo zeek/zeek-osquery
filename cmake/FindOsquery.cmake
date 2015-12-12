@@ -17,18 +17,18 @@
 #  OSQUERY_LIBRARY           The osquery library/libraries
 #  OSQUERY_INCLUDE_DIR       The location of osquery headers
 
-find_path(OSQUERY_ROOT
+find_path(OSQUERY_ROOT_DIR
     NAMES include/osquery/sdk.h
 )
 
 find_library(OSQUERY_LIBRARY
     NAMES osquery
-    HINTS ${OSQUERY_ROOT}/lib
+    HINTS ${OSQUERY_ROOT_DIR}/lib
 )
 
 find_path(OSQUERY_INCLUDE_DIR
     NAMES osquery/sdk.h
-    HINTS ${OSQUERY_ROOT}/include
+    HINTS ${OSQUERY_ROOT_DIR}/include
 )
 
 include(FindPackageHandleStandardArgs)
@@ -38,7 +38,7 @@ find_package_handle_standard_args(osquery DEFAULT_MSG
 )
 
 mark_as_advanced(
-    OSQUERY_ROOT
+    OSQUERY_ROOT_DIR
     OSQUERY_LIBRARY
     OSQUERY_INCLUDE_DIR
 )

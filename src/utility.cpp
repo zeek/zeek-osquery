@@ -11,6 +11,7 @@
 #include <errno.h>
 #include "utility.h"
 
+#include "config.h"
 
 /*
  * Start of SignalHandler Class member functions
@@ -57,7 +58,7 @@ void SignalHandler::setExitSignal(bool _bExitSignal)
 FileReader::FileReader()
 {
     //initialize kPath with the file directory 
-    kPath = "/var/osquery/broker.ini";
+    kPath = BROKER_INI_PATH;
 }
 
 int FileReader::read()

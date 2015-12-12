@@ -1,0 +1,3 @@
+
+/* Where to search broker.ini */
+#cmakedefine BROKER_INI_PATH "${BROKER_INI_PATH}"
