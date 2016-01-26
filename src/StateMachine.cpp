@@ -50,10 +50,18 @@ int StateMachine::initializeStateMachine()
     setupTimerInterval(timerInterval);
      
     // if reading is successful
+    
+    //if new HostName hack is working then 
     // then make a broker connection manager object
-    ptBCM = new BrokerConnectionManager(getLocalHostIp(),
+    ptBCM = new BrokerConnectionManager(fileReader.getHostName(),
         fileReader.getBrokerTopic(),
         std::atoi(fileReader.getBrokerConnectionPort().c_str()));
+    /*
+     * else
+     // then make a broker connection manager object
+    ptBCM = new BrokerConnectionManager(getLocalHostIp(),
+        fileReader.getBrokerTopic(),
+        std::atoi(fileReader.getBrokerConnectionPort().c_str()));*/
 
     connectionResponse = false;
     // Try to establish connection with master at IP given in

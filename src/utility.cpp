@@ -81,15 +81,37 @@ int FileReader::read()
             {
                 //extract the value of interest
                 auto sp = osquery::split(strings[i],"=");
-                temp[i] = sp[1].substr(1,sp[1].size()-2);  
+                temp[i] = sp[1].substr(1,sp[1].size()-2);
+                //assign values to hostName, broker-topic and broker_port
+                if(sp[0]=="HostName")
+                {
+                    hostName = temp[i];
+                }
+                else if(sp[0]== "broker_topic")
+                {
+                    bTopic = temp[i];
+                }
+                else if(sp[0]== "broker_port")
+                {
+                    brPort = temp[i];
+                }
+                else if(sp[0]== "master_ip")
+                {
+                    masterIP = temp[i];
+                }
+                else if(sp[0]== "retry_interval")
+                {
+                    retryInterval = temp[i];
+                }
+                else if(sp[0]== "timer_interval")
+                {
+                    timerInterval = temp[i];
+                }
+                else
+                    LOG(WARNING) << "Illegal content " << " in broker.ini";
+                
             }
-            //assign values to hostName, broker-topic and broker_port
-            hostName = temp[0];
-            bTopic = temp[1];
-            brPort = temp[2];
-            masterIP = temp[3];
-            retryInterval = temp[4];
-            timerInterval = temp[5];
+          
         }
         else
         {
