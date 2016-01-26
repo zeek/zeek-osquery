@@ -1,6 +1,6 @@
-HostName="Osquery"
+HostName="<insert local IP address>"
+master_ip="<insert IP address of Bro host>"
 broker_topic="/bro/osquery/"
 broker_port="9999"
-master_ip="${BRO_HOST}"
 retry_interval="500000"
 timer_interval="250"

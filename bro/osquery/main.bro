@@ -309,6 +309,8 @@ event BrokerComm::incoming_connection_established(peer_name: string)
 	{
 	log_peer("info", peer_name, "incoming connection established");
 
+	print peer_name;
+	
 	local ip = to_addr(peer_name);
 
 	local ours = F;

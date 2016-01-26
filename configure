@@ -34,6 +34,7 @@ Usage: $0 [OPTION]... [VAR=VALUE]...
     --enable-debug         compile in debugging mode (like --build-type=Debug)
 
   Required Packages in Non-Standard Locations:
+    --with-bro=PATH        path to Bro installation
     --with-broker=PATH     path to Broker installation
     --with-caf=PATH        path to CAF installation
     --with-osquery=PATH    path to osquery installation
@@ -62,7 +63,6 @@ builddir=build
 prefix=/usr/local
 CMakeCacheEntries=""
 append_cache_entry CMAKE_INSTALL_PREFIX PATH     $prefix
-append_cache_entry BRO_HOST             STRING   "127.0.0.1"
 
 # parse arguments
 while [ $# -ne 0 ]; do
@@ -83,14 +83,14 @@ while [ $# -ne 0 ]; do
             prefix=$optarg
             append_cache_entry CMAKE_INSTALL_PREFIX PATH   $optarg
             ;;
-        --bro-host=*)
-            append_cache_entry BRO_HOST             STRING $optarg
-            ;;
         --build-type=*)
             append_cache_entry CMAKE_BUILD_TYPE     STRING $optarg
             ;;
         --enable-debug)
             append_cache_entry ENABLE_DEBUG         BOOL   true
+            ;;
+        --with-bro=*)
+            append_cache_entry BRO_ROOT_DIR         PATH   $optarg
             ;;
         --with-broker=*)
             append_cache_entry BROKER_ROOT_DIR      PATH   $optarg

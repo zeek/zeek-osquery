@@ -9,6 +9,7 @@ project(bro-osquery)
 set(TARGET BrokerQueryManagerPlugin)
 
 find_package(Libcaf COMPONENTS core io REQUIRED)
+find_package(Bro REQUIRED)
 find_package(Broker REQUIRED)
 find_package(Osquery REQUIRED)
 find_package(Glog REQUIRED)
@@ -23,6 +24,7 @@ set(LINK_LIBS ${LINK_LIBS} ${LIBCAF_LIBRARIES} ${BROKER_LIBRARY} ${OSQUERY_LIBRA
 set(CMAKE_CXX_FLAGS "-I ${BROKER_INCLUDE_DIR} -I ${OSQUERY_INCLUDE_DIR} -I ${GLOG_INCLUDE_DIR} ${CMAKE_CXX_FLAGS}")
 
 include(RequireCXX11)
+include(InstallClobberImmune)
 
 # Platform specifics.
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
@@ -61,26 +63,34 @@ SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 add_executable(${TARGET} ${SRCS})
 target_link_libraries(${TARGET} ${LINK_LIBS})
 set_target_properties(${TARGET} PROPERTIES OUTPUT_NAME "${TARGET}.ext")
+
 #set_target_properties(${TARGET} PROPERTIES INSTALL_RPATH ${BROKER_ROOT_DIR}/lib)
 #set_target_properties(${TARGET} PROPERTIES INSTALL_RPATH ${LIBCAF_ROOT_DIR}/lib)
 
-install(FILES ${CMAKE_BINARY_DIR}/etc/broker.ini DESTINATION etc)
+install(FILES ${CMAKE_BINARY_DIR}/etc/broker.ini DESTINATION etc RENAME broker.ini.sample)
 install(FILES ${CMAKE_BINARY_DIR}/etc/bro.load DESTINATION etc/osquery)
 install(TARGETS ${TARGET} RUNTIME DESTINATION lib/osquery/extensions)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/bro/osquery DESTINATION ${BRO_SITE_DIR})
+
+InstallClobberImmune(${CMAKE_BINARY_DIR}/etc/broker.ini ${BROKER_INI_PATH})
+
+install(CODE "execute_process(COMMAND /bin/chown root:root ${CMAKE_INSTALL_PREFIX}/lib/osquery/extensions/${TARGET}.ext)")
+
 
 message(
     "\n==================|  Bro-Osquery Config Summary  |===================="
-    "\nInstall prefix:  ${CMAKE_INSTALL_PREFIX}"
-    "\nBroker prefix:   ${BROKER_ROOT_DIR}"
-    "\nCAF prefix:      ${LIBCAF_ROOT_DIR}"
-    "\nOsquery prefix:  ${OSQUERY_ROOT_DIR}"
-    "\nBro host:        ${BRO_HOST}"
+    "\nInstall prefix:   ${CMAKE_INSTALL_PREFIX}"
+    "\nBro prefix:       ${BRO_ROOT_DIR}"
+    "\nBro site scripts: ${BRO_SITE_DIR}"
+    "\nBroker prefix:    ${BROKER_ROOT_DIR}"
+    "\nCAF prefix:       ${LIBCAF_ROOT_DIR}"
+    "\nOsquery prefix:   ${OSQUERY_ROOT_DIR}"
     "\n"
-    "\nLink libraries:  ${LINK_LIBS}"
-    "\nCC:              ${CMAKE_C_COMPILER}"
-    "\nCFLAGS:          ${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_${BuildType}}"
-    "\nCXX:             ${CMAKE_CXX_COMPILER}"
-    "\nCXXFLAGS:        ${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${BuildType}}"
+    "\nLink libraries:   ${LINK_LIBS}"
+    "\nCC:               ${CMAKE_C_COMPILER}"
+    "\nCFLAGS:           ${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_${BuildType}}"
+    "\nCXX:              ${CMAKE_CXX_COMPILER}"
+    "\nCXXFLAGS:         ${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${BuildType}}"
     "\n=================================================================")
 
 include(UserChangedWarning)
