@@ -17,7 +17,7 @@ export {
 		};
 }
 
-event process_open_sockets(host: string, utype: string, pid:int,
+event open_sockets(host: string, utype: string, pid:int,
 			   protocol: int, local_address: string, remote_address: string,
 			   local_port: int, remote_port: int)
 	{
@@ -67,7 +67,7 @@ event bro_init()
 	{
 	Log::create_stream(LOG, [$columns=Info, $path="osq-sockets"]);
 	
-	local ev = [$ev=process_open_sockets,
+	local ev = [$ev=open_sockets,
 		    $query="SELECT pid, protocol, local_address, remote_address, local_port, remote_port from process_open_sockets"];
 	osquery::subscribe(ev);
 	}
