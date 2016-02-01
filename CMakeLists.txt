@@ -74,9 +74,6 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/bro/osquery DESTINATION ${BRO_SITE_DIR})
 
 InstallClobberImmune(${CMAKE_BINARY_DIR}/etc/broker.ini ${BROKER_INI_PATH})
 
-install(CODE "execute_process(COMMAND /bin/chown root:root ${CMAKE_INSTALL_PREFIX}/lib/osquery/extensions/${TARGET}.ext)")
-
-
 message(
     "\n==================|  Bro-Osquery Config Summary  |===================="
     "\nInstall prefix:   ${CMAKE_INSTALL_PREFIX}"

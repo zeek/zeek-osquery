@@ -32,6 +32,7 @@ Usage: $0 [OPTION]... [VAR=VALUE]...
 
   Optional Features:
     --enable-debug         compile in debugging mode (like --build-type=Debug)
+    --osquery-socket=PATH  path to osquery's extension socket (default: /var/osquery/osquery.em)
 
   Required Packages in Non-Standard Locations:
     --with-bro=PATH        path to Bro installation
@@ -63,6 +64,7 @@ builddir=build
 prefix=/usr/local
 CMakeCacheEntries=""
 append_cache_entry CMAKE_INSTALL_PREFIX PATH     $prefix
+append_cache_entry OSQUERY_SOCKET       PATH     /var/osquery/osquery.em
 
 # parse arguments
 while [ $# -ne 0 ]; do
@@ -88,6 +90,9 @@ while [ $# -ne 0 ]; do
             ;;
         --enable-debug)
             append_cache_entry ENABLE_DEBUG         BOOL   true
+            ;;
+        --osquery-socket=*)
+            append_cache_entry OSQUERY_SOCKET       PATH   $optarg
             ;;
         --with-bro=*)
             append_cache_entry BRO_ROOT_DIR         PATH   $optarg
