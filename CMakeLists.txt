@@ -5,8 +5,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 
 project(bro-osquery)
 
-# Name of extension (exluding '.ext').
-set(TARGET BrokerQueryManagerPlugin)
+# Name of extension.
+set(TARGET bro-osquery)
 
 find_package(Libcaf COMPONENTS core io REQUIRED)
 find_package(Bro REQUIRED)
@@ -56,21 +56,15 @@ set(BROKER_INI_PATH "${CMAKE_INSTALL_PREFIX}/etc/broker.ini")
 
 configure_file(${CMAKE_SOURCE_DIR}/src/config.h.in ${CMAKE_BINARY_DIR}/src/config.h)
 configure_file(${CMAKE_SOURCE_DIR}/etc/broker.ini.in ${CMAKE_BINARY_DIR}/etc/broker.ini)
-configure_file(${CMAKE_SOURCE_DIR}/etc/bro.load.in ${CMAKE_BINARY_DIR}/etc/bro.load)
+configure_file(${CMAKE_SOURCE_DIR}/etc/bro-osquery.service.in ${CMAKE_BINARY_DIR}/etc/bro-osquery.service)
 
 SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 add_executable(${TARGET} ${SRCS})
 target_link_libraries(${TARGET} ${LINK_LIBS})
-set_target_properties(${TARGET} PROPERTIES OUTPUT_NAME "${TARGET}.ext")
-
-#set_target_properties(${TARGET} PROPERTIES INSTALL_RPATH ${BROKER_ROOT_DIR}/lib)
-#set_target_properties(${TARGET} PROPERTIES INSTALL_RPATH ${LIBCAF_ROOT_DIR}/lib)
 
 install(FILES ${CMAKE_BINARY_DIR}/etc/broker.ini DESTINATION etc RENAME broker.ini.sample)
-install(FILES ${CMAKE_BINARY_DIR}/etc/bro.load DESTINATION etc/osquery)
-install(TARGETS ${TARGET} RUNTIME DESTINATION lib/osquery/extensions)
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/bro/osquery DESTINATION ${BRO_SITE_DIR})
+install(TARGETS ${TARGET} RUNTIME DESTINATION bin)
 
 InstallClobberImmune(${CMAKE_BINARY_DIR}/etc/broker.ini ${BROKER_INI_PATH})
 
