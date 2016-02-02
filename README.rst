@@ -32,7 +32,7 @@ extension to add the following events to::
 
 These events can be handled inside custom scripts like any other Bro
 event. The pre-written scripts also record this host information into
-corresponding Bro log files. Here's an excerpt from 
+corresponding Bro log files. Here's an excerpt from
 ``osq-process.log``::
 
     #fields t               host            pid     ppid    path            uid     euid    gid     egid    argv
@@ -53,26 +53,38 @@ corresponding Bro log files. Here's an excerpt from
 Installation
 ------------
 
-We recommend to start by building all of osquery, Bro, and the
-extension on the same host, which we call the "build host" in the 
+We recommend to start by installing all of osquery, Bro, and the
+extension on the same host, which we call the "build host" in the
 following. We also assume that Bro will then run on that system. For
 the host systems to be monitored with osquery ("end systems"), the
-installation footprint is smaller and best done through packages that
-install just the binary versions of osquery and extensions.
+installation footprint is smaller and best done by installing just
+binary versions of osquery and the extension.
 
 Build Host
 ~~~~~~~~~~
 
-Due to the number of pieces involved, the installation is a bit more
-complex and might differ in specifics depending on the platform.
-Generally, the following are the main steps to (1) install osquery
-into ``/usr/local``; (2) install the bro-osquery extension with its
-dependencies into ``/opt/bro-osquery``; and (3) install Bro into
-``/opt/bro/``. This is all best done as root, as multiple parts need
-corresponding permissions. We generally require recent development
-versions of all the software right now.
+Due to the number of pieces involved, the installation on the build
+host is rather complex and might differ in specifics depending on your
+platform. Generally, the three main parts are
 
-    - Build and install `osquery <https://osquery.io>`_::
+    1. Install osquery. In the following we assume it goes into
+       ``/usr/local``.
+
+    2. Install the bro-osquery extension with its dependencies. We
+       assume this goes into ``/opt/bro-osquery/``.
+
+    3. Install Bro. We assume Bro goes into ``/opt/bro/``.
+
+
+This is all best done as root, as multiple parts need corresponding
+permissions. We generally require recent development versions of all
+the software for the time being.
+
+In more detail, these are the steps involved:
+
+    - Install `osquery <https://osquery.io>`_. You can either install
+      it from a binary package provided on their site, or build it
+      from source like this::
 
         # git clone http://github.com/facebook/osquery.git
         # cd osquery
@@ -80,6 +92,11 @@ versions of all the software right now.
         # mkdir /var/osquery && cp /usr/local/share/osquery/osquery.example.conf /var/osquery/osquery.conf
 
       Check ``osquery.conf`` if you need to edit anything.
+
+      Start up ``/usr/local/bin/osqueryd`` as root. In practice, you
+      will likely want put this into an init script or add it to
+      systemd; osquery comes with corresponding templates in
+      ``tools/deployment/``.
 
     - Build and install `CAF <https://github.com/actor-framework/actor-framework>`_
       (a dependency for Bro's communication library Broker)::
@@ -109,10 +126,6 @@ versions of all the software right now.
         # ./configure --prefix=/opt/bro-osquery --with-bro=/opt/bro
         # make && make install
 
-      .. note:: You need to install the plugin as root, as osqery
-         requires it to be owned by root (and doesn't report an error
-         if it isn't; it just won't use it).
-
     - Edit ``/opt/bro-osquery/etc/broker.ini``: Fill in ``HostName``
       and ``master_ip``. For now you have to use *IP addresses*, not
       hostnames, in either case. This fill be fixed later.
@@ -133,20 +146,39 @@ versions of all the software right now.
     - Start Bro with ``/opt/bro/bin/broctl start``. Bro logs will be
       written to ``/opt/bro/logs/current``.
 
-    - To monitor host activity on the build host, start ``osqueryd``
-      with ``/usr/local/bin/osqueryd
-      --extensions_autoload=/opt/bro-osquery/etc/osquery/bro.load``
-
-      ``/opt/bro/logs/current/osquery.log`` will record incoming
+    - To monitor host activity on the build host, run
+      ``/opt/bro-osquery/bin/bro-osquery``.
+      ``/opt/bro/logs/current/osquery.log`` will now record incoming
       connections from the extension, and
       ``/opt/bro/logs/current/osq-*.log`` will record reported
       activity.
 
+      Normally, you will want to run ``bro-osquery`` through and init
+      script or systemd. The build process generates a service file
+      for systemd in ``build/etc/bro-osquery.service``.
+
 End Systems
 ~~~~~~~~~~~
 
-TODO: Figure out steps for building packages.
+.. note::
+    The following isn't tested yet.
 
+
+- Install osquery similar to the build host. However, note that if you
+  have built osquery from source, you don't need to redo that on the
+  end systems. Instead, ``make package`` in the osquery source
+  directory will build RPM packages that you can install.
+
+- There's no support for building a binary bro-osquery package yet but
+  you can just copy ``/opt/bro-osquery`` from the build system over to
+  the end systems.
+
+- Edit ``/opt/bro-osquery/etc/broker.ini``: Fill in ``HostName`` and
+  ``master_ip``. For now you have to use *IP addresses*, not
+  hostnames, in either case. This fill be fixed later.
+
+- Start both ``osqueryd`` and ``/opt/bro-osquery/bin/bro-osquery``,
+  just as you did above on the build host.
 
 Todo List
 ---------
