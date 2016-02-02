@@ -1,0 +1,12 @@
+[Unit]
+Description=bro-osquery extension
+Requires=osqueryd.service
+
+[Service]
+Type=simple
+ExecStart=${CMAKE_INSTALL_PREFIX}/bin/bro-osquery
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
