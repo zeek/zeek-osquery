@@ -1,3 +1,7 @@
 
 /* Where to search broker.ini */
 #cmakedefine BROKER_INI_PATH "${BROKER_INI_PATH}"
+
+/* Where osquery's extension socket is located. */
+#cmakedefine OSQUERY_SOCKET "${OSQUERY_SOCKET}"
+
