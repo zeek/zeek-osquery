@@ -9,14 +9,15 @@
  */
 #include <signal.h>
 #include <errno.h>
+#include <boost/algorithm/string.hpp>
 #include "utility.h"
 
-#include "config.h"
-
+using std::fstream;
+using std::ios;
 /*
  * Start of SignalHandler Class member functions
  */
-
+//to track SIGKILL signal event
 bool SignalHandler::mbGotExitSignal = false;
 
 
@@ -31,6 +32,7 @@ void SignalHandler::setupSignalHandler()
 
 void SignalHandler::exitSignalHandler(int _ignored)
 {
+    //set SIGKILL signal flag
     mbGotExitSignal = true;
 }
 
@@ -53,15 +55,15 @@ void SignalHandler::setExitSignal(bool _bExitSignal)
  */
 
 /*
- * Start of FileReader class member functions
+ * Start of FileReaderWriter class member functions
  */
-FileReader::FileReader()
+FileReaderWriter::FileReaderWriter()
 {
     //initialize kPath with the file directory 
-    kPath = BROKER_INI_PATH;
+    kPath = "/var/osquery/broker.ini";
 }
 
-int FileReader::read()
+int FileReaderWriter::read()
 {
     //check if file exits?
     auto s = osquery::pathExists(kPath);
@@ -111,7 +113,6 @@ int FileReader::read()
                     LOG(WARNING) << "Illegal content " << " in broker.ini";
                 
             }
-          
         }
         else
         {
@@ -127,41 +128,45 @@ int FileReader::read()
     return 0;
 }
 
-std::string FileReader::getHostName()
+///////////////////////////////////////////////////////////////////////////
+////////////////////Helper Function///////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+
+std::string FileReaderWriter::getHostName()
 {
     //return local host name
     return hostName;
 }
 
-std::string FileReader::getBrokerTopic()
+std::string FileReaderWriter::getBrokerTopic()
 {
     //return broker_topic in string form
     return bTopic;
 }
 
-std::string FileReader::getBrokerConnectionPort()
+std::string FileReaderWriter::getBrokerConnectionPort()
 {
     //return broker port in string form
     return brPort;
 }
 
-std::string FileReader::getMasterIp()
+std::string FileReaderWriter::getMasterIp()
 {
     return masterIP;
 }
 
-std::string FileReader::getRetryInterval()
+std::string FileReaderWriter::getRetryInterval()
 {
     return retryInterval;
 }
 
-std::string FileReader::getTimerInterval()
+std::string FileReaderWriter::getTimerInterval()
 {
     return timerInterval;
 }
 
 /*
- * End of FileReader Class member functions
+ * End of FileReaderWriter Class member functions
  */
 
 std::string getLocalHostIp()
@@ -186,3 +191,180 @@ std::string getLocalHostIp()
     }
     return "";
 }
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+///////////////////////Database class functions///////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+offlineSqliteDB::offlineSqliteDB()
+{
+    zErrMsg = 0;
+    rc = 0;
+}
+
+int offlineSqliteDB::init()
+{
+    //to hold sql command
+    char *sql;
+    //////////////////////////////////////////////
+    //output file stream
+    std::ofstream dbfile;
+    //create a file if it does not exits
+    dbfile.open("/tmp/offlineLogs.db");
+    //close the file
+    dbfile.close();
+    //////////////////////////////////////////////////////////
+    //test if db file is accessable
+    rc = sqlite3_open("/tmp/offlineLogs.db", &db);
+    if (rc)
+    {
+	LOG(ERROR) << "Can't open database: " <<sqlite3_errmsg(db);
+        return -1;
+    }
+    
+    //sql command to create table with two enteries
+    std::string tmpQuery = std::string("CREATE TABLE OFFLINELOGGING(")
+            + std::string("ID INT PRIMARY KEY NOT NULL,")
+            + std::string("EVENT TEXT NOT NULL);");
+    sql = (char *)(tmpQuery.c_str());
+    //Execute SQL command
+    rc = sqlite3_exec (db, sql, callback, 0 ,&zErrMsg);
+    //if no success
+    if (rc != SQLITE_OK)
+    {
+        LOG(ERROR) << "SQL error: " << zErrMsg ;
+    }
+    //close the database file
+    sqlite3_close(db);
+    //success code = 1
+    return 1;
+}
+
+int offlineSqliteDB::insertAnEvent(int count, std::string msg)
+{
+    db = NULL; rc = 0;
+    char *sql;
+    std::string tmpQuery;
+    //test if db file is accessable
+    rc = sqlite3_open("/tmp/offlineLogs.db", &db);
+    if (rc)
+    {
+	LOG(ERROR) << "Can't open database: " <<sqlite3_errmsg(db);
+        return -1;
+    }
+    
+    tmpQuery = std::string("INSERT INTO OFFLINELOGGING (ID,EVENT)")
+            + std::string("VALUES (")
+            + std::string(std::to_string(count))
+            + std::string(",")
+            + std::string("\"")
+            + msg 
+            + std::string("\"")
+            + std::string(");");
+    
+    sql = (char *)(tmpQuery.c_str());
+    //Execute SQL command
+    rc = sqlite3_exec (db, sql, callback, 0 ,&zErrMsg);
+    //if no success
+    if (rc != SQLITE_OK)
+    {
+        LOG(ERROR) << "SQL error: " << zErrMsg ;
+    }
+    //close the database file
+    sqlite3_close(db);
+}
+
+std::string offlineSqliteDB::parseAnEvent(int count)
+{
+    db = NULL; rc = 0;
+    //check if file exits?
+    auto s = osquery::pathExists("/tmp/offlineLogs.db");
+    //if file exists then
+    if(s.ok())
+    {
+    
+    char *sql;
+    std::string tmpQuery;
+    //test if db file is accessable
+    rc = sqlite3_open("/tmp/offlineLogs.db", &db);
+    if (rc)
+    {
+	LOG(ERROR) << "Can't open database: " <<sqlite3_errmsg(db);
+        //return -1;
+    }
+    
+    tmpQuery = std::string("SELECT * FROM OFFLINELOGGING WHERE ID == ")
+            + std::to_string(count)
+            + std::string(";");
+    sql = (char *)(tmpQuery.c_str());
+    //clear data before callback function operation
+    cBData = "";
+    //Execute SQL command
+    rc = sqlite3_exec (db, sql, callback, 0 ,&zErrMsg);
+    //if no success
+    if (rc != SQLITE_OK)
+    {
+        LOG(ERROR) << "SQL error: " << zErrMsg ;
+    }
+    //close the database file
+    sqlite3_close(db);
+    }
+    else
+    {
+        LOG(WARNING) << "DB file does not exits";
+    }
+    return cBData;
+}
+
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+///////////////////////Global functions///////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+
+std::vector<std::string> lsplit(const std::string& s, const std::string& delim) {
+  std::vector<std::string> elems;
+  boost::split(elems, s, boost::is_any_of(delim));
+  auto start =
+      std::remove_if(elems.begin(), elems.end(), [](const std::string& s) {
+        return s.size() == 0;
+      });
+  elems.erase(start, elems.end());
+  for (auto& each : elems) {
+    boost::algorithm::trim(each);
+  }
+  return elems;
+}
+
+std::vector<std::string> lsplit(const std::string& s,
+                               const std::string& delim,
+                               size_t occurences) {
+  // Split the string normally with the required delimiter.
+  auto content = lsplit(s, delim);
+  // While the result lsplit exceeds the number of requested occurrences, join.
+  std::vector<std::string> accumulator;
+  std::vector<std::string> elems;
+  for (size_t i = 0; i < content.size(); i++) {
+    if (i < occurences) {
+      elems.push_back(content.at(i));
+    } else {
+      accumulator.push_back(content.at(i));
+    }
+  }
+  // Join the optional accumulator.
+  if (accumulator.size() > 0) {
+    elems.push_back(join(accumulator, delim));
+  }
+  return elems;
+}
+
+int callback(void *data, int argc, char **argv, char **azColName)
+{
+    cBData = argv[1];
+    return 0;
+}
+

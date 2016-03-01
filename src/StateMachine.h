@@ -104,6 +104,8 @@ typedef std::deque<std::vector<broker::data>,
 class StateMachine
 {
 private:
+  //to track whether 1st time connection is established
+  bool connectionCount;
   // to store  the return values of BrokerQueryManager functions and
   // use it for comparison purpose
   bool processResponse;
@@ -116,7 +118,7 @@ private:
   //timer interval in millsec variable
   int timerInterval;
   // itimerval constructor to set initial value for timer.
-  struct itimerval timer;
+  struct itimerval liveTimer;
   //variable to check if timer has expired or has not
   static bool isTimerEvent;
   //To hold the event 
@@ -127,9 +129,9 @@ private:
   SignalHandler *signalHandler;
   // BrokerConnectionManager class pointer
   BrokerConnectionManager* ptBCM;
-  //FileReader Class Object
-  FileReader fileReader;
-  
+  //FileReaderWriter Class Object
+  FileReaderWriter fileReader;
+ 
   
 private:
     /**
@@ -288,9 +290,9 @@ private:
      * resources and set the pointer to entry point of machine. 
      */
     void doActionsForConnectionBrokenEvent();
-    
-public:
-    
+   
+   
+public:  
     /**
      * @brief Constructor 
      * To Initialize class fields for safe usages

@@ -134,6 +134,14 @@ public:
      */  
     broker::message_queue* getMessageQueuePointer();
     
+    /**    
+     *  @brief Function is used to start peering with master 
+     *  Uses peering to start connection with master using broker library
+     *  
+     */  
+    void setBrokerPeering(std::string master_ip);
+    
+    
     /**
      * @brief Closes the broker connection 
      * Simply un-peer the already established connection

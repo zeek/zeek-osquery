@@ -108,6 +108,8 @@ private:
     query_columns_map qmap;
     // to track the CTRL +C kill signal
     SignalHandler *handle;
+    //for offline logging
+    FileReaderWriter frw;
     
 public:
     /**
@@ -156,8 +158,9 @@ public:
      *  This function manages and monitors the life cycle of queries, and
      *  tracks update in given queries tables: till the broker connection
      *  is up.
+     *  @param serverUp flag to check if the server is online
      */ 
-    void queriesUpdateTrackingHandler();
+    void queriesUpdateTrackingHandler(bool serverUp);
     
     
     /**
@@ -176,8 +179,9 @@ public:
      * 
      *  @param iterator to indicate query for which we need to calculate
      *  difference.
+     *  @param serverUp flag to check if the server is online
      */
-    void diffResultsAndEventTriger(int& i);
+    void diffResultsAndEventTriger(int& i, bool serverUp);
     
    /**    
     * @brief Sends update events to master in the form of broker::messages
@@ -201,6 +205,23 @@ public:
     *
     */
     input_query brokerMessageExtractor(const broker::message& msg);
+  
+    /**
+     * @brief This function is specifically used to send offline data to 
+     * bro master after it is down for some reason.
+     * 
+     * @param msg formated broker message ready for send to master
+     */
+    void sendBrokerMessageToMaster(broker::message msg);
+    
+    /**
+    * @brief Converts a given string into broker message. Specifically, used 
+    * to convert saved data in database into broker::message.
+    * @param fileEvent String read from a file
+    * @return return broker formated message
+    *
+    */
+    broker::message stringToBrokerMessage(std::string fileEvent);
     
     /**    
      * @brief Checks whether string contains all digits or not
@@ -252,15 +273,6 @@ public:
     void sendErrortoBro(std::string str);
     
     /**
-     * @brief send errors to bro-side before the group topic is not set.
-     * This function is responsible for sending error events to bro-side in 
-     * the form of events.
-     * 
-     * @param str a string containing error message 
-     */
-    void sendErrorBeforeGroupTopic(std::string str);
-    
-    /**
      * @brief send errors to bro-side
      * Sends ready event to bro-side as an ACK message so that bro-side start
      * sending SQL queries. This function is called after group topic is
@@ -305,6 +317,21 @@ public:
      * @return returns ture if the in_query_vector is not empty 
      */
     bool getInQueryVectorStatus();   
+    
+    /**
+     * @brief writes contents in the specified log file with given contents
+     * 
+     * @param temp QueryData that holds update information whether added
+     *  or removed
+     * @param event_type Event type might be ADD, REMOVE, INIT_DUMP
+     * @param iterator internal variable to map table with corresponding query
+     * 
+     * @return Returns 0 if reading is successful else returns the error code
+     */
+    int writeLogFileLocally(const QueryData& temp,
+        std::string event_type, int& iterator);
+    
+    
 };
 
 

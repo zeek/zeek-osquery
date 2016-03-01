@@ -45,30 +45,46 @@ int StateMachine::initializeStateMachine()
         return  KILL_SIGNAL;
     }
      
-    //initialize the timer with timer_interval after reading broker.ini
-    timerInterval = std::atoi(fileReader.getTimerInterval().c_str());
-    setupTimerInterval(timerInterval);
      
-    // if reading is successful
+    if(!connectionCount)
+    {
+       //initialize the timer with timer_interval after reading broker.ini
+      timerInterval = std::atoi(fileReader.getTimerInterval().c_str());
+      setupTimerInterval(timerInterval);
+      
+      // if reading is successful
+      // then make a broker connection manager object
+      ptBCM = new BrokerConnectionManager(getLocalHostIp(),
+          fileReader.getBrokerTopic(),
+          std::atoi(fileReader.getBrokerConnectionPort().c_str()));
     
-    //if new HostName hack is working then 
-    // then make a broker connection manager object
-    ptBCM = new BrokerConnectionManager(fileReader.getHostName(),
-        fileReader.getBrokerTopic(),
-        std::atoi(fileReader.getBrokerConnectionPort().c_str()));
-    /*
-     * else
-     // then make a broker connection manager object
-    ptBCM = new BrokerConnectionManager(getLocalHostIp(),
-        fileReader.getBrokerTopic(),
-        std::atoi(fileReader.getBrokerConnectionPort().c_str()));*/
+    connectionCount = true;
+    }
 
     connectionResponse = false;
-    // Try to establish connection with master at IP given in
-    // "broker.ini"
-    connectionResponse = ptBCM->connectToMaster(fileReader.getMasterIp()
-            ,std::chrono::duration<double>
-    (std::atoi(fileReader.getRetryInterval().c_str())), signalHandler);
+    
+    LOG(WARNING) <<"Connecting to Master at "<<fileReader.getMasterIp();
+    //peer with local host via broker
+    ptBCM->setBrokerPeering(fileReader.getMasterIp());
+    //try establishing connection with master
+    while(!connectionResponse && !(signalHandler->gotExitSignal()))
+    {
+      // Try to establish connection with master at IP given in
+      // "broker.ini"
+      connectionResponse = ptBCM->connectToMaster(fileReader.getMasterIp()
+              ,std::chrono::duration<double>
+      (std::atoi(fileReader.getRetryInterval().c_str())), signalHandler);
+      
+      //if timer event occurs
+      if(isTimerEvent)
+      {
+        doActionsForTimerEvent();
+      }
+    }
+    //stop the timer
+    StateMachine::isTimerEvent = false;
+    // if reinitialize all query vectors
+    ptBCM->getQueryManagerPointer()->ReInitializeVectors();
     //if the connection is not established then there must be CTRL +C
     if(!connectionResponse)
     {
@@ -108,10 +124,10 @@ int StateMachine::extractAndProcessEvents(int event,broker::message msg)
     switch(currentState)
     {
         case WAIT_FOR_TOPIC:
-            {
-                statusCode = processEventsInWaitForTopicState(event,msg);
-                break;
-            }
+        {
+            statusCode = processEventsInWaitForTopicState(event,msg);
+            break;
+        }
         case GET_AND_PROCESS_QUERIES:
             {
                 statusCode = processEventsInGetAndProcessQueriesState(event,msg);
@@ -160,13 +176,12 @@ int StateMachine::processEventsInWaitForTopicState(int ev,
         }
         default:
         {
-            std::string stringStream;
-            stringStream = eventToString(ev)  + " is not allowed in " +
-                    "WAIT_FOR_TOPIC" + " expecting group topic events";
+            std::ostringstream stringStream;
+            stringStream << eventToString(ev) << " is not allowed in " <<
+                    "WAIT_FOR_TOPIC" << "expecting group topic events";
             LOG(WARNING) << stringStream;
-            
-            ptBCM->getQueryManagerPointer()->sendErrorBeforeGroupTopic(
-                        stringStream);
+            ptBCM->getQueryManagerPointer()->
+                sendErrortoBro(stringStream.str());
         }
     };
 }
@@ -183,8 +198,8 @@ int StateMachine::doActionsForGroupTopicEvent(broker::message msg)
     {
         LOG(WARNING) << "Connection Broken" ;
 
-        //delete  BrokerConnectionManager Object
-        delete ptBCM;
+        //Close broker connection and unpeer it
+        ptBCM->closeBrokerConnection();
         return FAILURE;
     }
     else if(topicResponse == -1)
@@ -230,13 +245,12 @@ int StateMachine::processEventsInGetAndProcessQueriesState(int ev,
         }
         default:
         {
-            std::string stringStream;
-            stringStream = eventToString(ev)  + " is not allowed in " +
-                    "GET_AND_PROCESS_QUERIES" + " expecting subscribe/"
-                    "unsubscribe events";
+            std::ostringstream stringStream;
+            stringStream << eventToString(ev) << " is not allowed in " <<
+                  "GET_AND_PROCESS_QUERIES " << "expecting subscription events";
             LOG(WARNING) << stringStream;
             ptBCM->getQueryManagerPointer()->
-                sendErrortoBro(stringStream);
+                sendErrortoBro(stringStream.str());
         }
     };
     
@@ -278,11 +292,7 @@ int StateMachine::processMasterQuery()
         // if connection is down then reinitialize all query vectors
         ptBCM->getQueryManagerPointer()->ReInitializeVectors();
         //delete  BrokerConnectionManager Object
-        if(ptBCM != NULL)
-        {
-            delete ptBCM;
-            ptBCM = NULL;
-        }
+        //delete ptBCM;
     }
     else
     {
@@ -324,11 +334,7 @@ int StateMachine::processEventsInTerminateState()
     // if connection is down then reinitialize all query vectors
     ptBCM->getQueryManagerPointer()->ReInitializeVectors();
     //delete  BrokerConnectionManager Object
-    if(ptBCM != NULL)
-    {
-        delete ptBCM;
-        ptBCM = NULL;
-    }
+    delete ptBCM;
     return SUCCESS;
 }
 
@@ -341,11 +347,7 @@ int StateMachine::doActionsForKillSignalEvent()
     // if connection is down then reinitialize all query vectors
     ptBCM->getQueryManagerPointer()->ReInitializeVectors();
     //delete  BrokerConnectionManager Object
-    if(ptBCM != NULL)
-    {
-        delete ptBCM;
-        ptBCM = NULL;
-    }
+    delete ptBCM;
     
     return SIG_KILL_EVENT;
 }
@@ -448,10 +450,10 @@ std::string StateMachine::eventToString(int ev)
 void StateMachine::setupTimerInterval(int interval)
 {
     /* Configure the timer to expire after interval msec... */
-    timer.it_value.tv_sec = 0;
-    timer.it_value.tv_usec = interval;
-    timer.it_interval.tv_sec = 0;
-    timer.it_interval.tv_usec = 0;     
+    liveTimer.it_value.tv_sec = 0;
+    liveTimer.it_value.tv_usec = interval;
+    liveTimer.it_interval.tv_sec = 0;
+    liveTimer.it_interval.tv_usec = 0;     
 }
 
 void StateMachine::initializeTimer()
@@ -465,58 +467,57 @@ void StateMachine::initializeTimer()
     
      /* Start a virtual timer. It counts down whenever this process is
        executing. */
-     setitimer (ITIMER_VIRTUAL, &timer, NULL);     
+     setitimer (ITIMER_VIRTUAL, &liveTimer, NULL);     
 }
 
 void StateMachine::processTimerEvent(int signum)
 {
-    StateMachine::isTimerEvent = true;
+    if(!(currentState == WAIT_FOR_TOPIC))
+    {
+        StateMachine::isTimerEvent = true;
+    }
 }
 
 
 int StateMachine::doActionsForTimerEvent()
 {
-    if(ptBCM != NULL)
+    ptBCM->trackResponseChangesAndSendResponseToMaster(
+                signalHandler);
+    StateMachine::isTimerEvent = false;
+    /* Start a virtual timer. It counts down whenever this process is
+   executing. */
+    //start the timer if no SIGKILL is received
+    if(!signalHandler->gotExitSignal())
     {
-        ptBCM->trackResponseChangesAndSendResponseToMaster(
-                    signalHandler);
-        StateMachine::isTimerEvent = false;
-        /* Start a virtual timer. It counts down whenever this process is
-       executing. */
-        if(ptBCM->isConnectionAlive())
-        {
-            setitimer (ITIMER_VIRTUAL, &timer, NULL);
-        }
+        setitimer (ITIMER_VIRTUAL, &liveTimer, NULL);
     }
 }
 
 
 void StateMachine::doActionsForConnectionBrokenEvent()
 {
-    // if connection is down then reinitialize all query vectors
-    ptBCM->getQueryManagerPointer()->ReInitializeVectors();
-    //delete  BrokerConnectionManager Object
-    if(ptBCM != NULL)
-    {
-        delete ptBCM;
-        ptBCM = NULL;
-    }
-    
+    // close broker connection
+    ptBCM->closeBrokerConnection();
 }
+
 
 int StateMachine::Run()
 {   
+    //initialize database
+    ptDb->init();
+    connectionCount = false;
     int statusCode = 0;
     // Run the program until SIG_KILL is not received
     do
     {
-        StateMachine::isTimerEvent = false;
         //initialize the state machine
         statusCode = initializeStateMachine();
         //set next state
         setNextState(statusCode);
         if(statusCode == SUCCESS)
         {
+            //turn the timer off --- as here objects will reconstruct themselves
+            StateMachine::isTimerEvent = false;
             // Run the program until connection is alive.
             do 
             {
@@ -532,7 +533,8 @@ int StateMachine::Run()
                 }
                 else if(!ptBCM->isConnectionAlive())
                 {
-                    break;
+                    broker::message temp;
+                    extractAndProcessEvents(CONNECTION_BROKEN_EVENT,temp);
                 }
                 // bro events processing 
                 else if(!tempQueue.empty())
@@ -567,19 +569,13 @@ int StateMachine::Run()
        
             }while(ptBCM->isConnectionAlive() &&
                     !signalHandler->gotExitSignal());
-            //do proper actions against each signal
-            if(!ptBCM->isConnectionAlive())
-            {
-                broker::message temp;
-                extractAndProcessEvents(CONNECTION_BROKEN_EVENT,temp);
-            }
-            else if(signalHandler->gotExitSignal())
+            
+            //if disconnected then break the connection.
+            LOG(WARNING) <<"Connection Broken";
+            
+            if(signalHandler->gotExitSignal())
             {
                 doActionsForKillSignalEvent();
-            }
-            else
-            {
-                LOG(WARNING) << "Illegal Signal Received in run loop";
             }
             
         }

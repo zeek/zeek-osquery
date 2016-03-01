@@ -11,8 +11,14 @@
 
 #include "BrokerQueryManager.h"
 #include "utility.h"
+#include "BrokerConnectionManager.h"
 
 
+ //variable to track no of offline event
+ int offlineCount=0;
+ //variable to track no of offline events sent to master
+ int eventSent=0;
+    
 BrokerQueryManager::BrokerQueryManager(broker::endpoint* lhost,
         broker::message_queue* mq,std::string btp)
 {
@@ -23,6 +29,7 @@ BrokerQueryManager::BrokerQueryManager(broker::endpoint* lhost,
     ptlocalhost = lhost;
     //pointer to message queue object
     ptmq = mq;
+   
     getlogin_r(username,SIZE);
 }
 
@@ -53,12 +60,12 @@ bool BrokerQueryManager::queryColumnExtractor()
     {
         input_query print = in_query_vector.at(i);
         LOG(WARNING) <<print.query;
-        // Extracts the columns in query using osquery::split function
-        for(auto& c1: osquery::split(print.query,"SELECT"))
+        // Extracts the columns in query using lsplit function
+        for(auto& c1: lsplit(print.query,"SELECT"))
         {
-            for(auto& c2: osquery::split(c1,"FROM"))
+            for(auto& c2: lsplit(c1,"FROM"))
             {
-                for(auto& c3: osquery::split(c2,","))
+                for(auto& c3: lsplit(c2,","))
                 {
                     qc.push_back(c3);
                 }
@@ -102,12 +109,11 @@ bool BrokerQueryManager::queryDataResultVectorInit()
     return (!out_query_vector.empty()) ? true: false;
 }
 
-void BrokerQueryManager::queriesUpdateTrackingHandler()
+void BrokerQueryManager::queriesUpdateTrackingHandler(bool serverUp)
 {
-
     for(int i=0;i<out_query_vector.size();i++)
     {
-        BrokerQueryManager::diffResultsAndEventTriger(i);
+        BrokerQueryManager::diffResultsAndEventTriger(i,serverUp);
     }
 
 }
@@ -123,7 +129,7 @@ QueryData BrokerQueryManager::getQueryResult(const std::string& queryString)
     return qd;
 }
 
-void BrokerQueryManager::diffResultsAndEventTriger(int& i)
+void BrokerQueryManager::diffResultsAndEventTriger(int& i, bool serverUp)
 {
     out_query_vector[i].current_results =
             getQueryResult(in_query_vector[i].query);
@@ -132,22 +138,75 @@ void BrokerQueryManager::diffResultsAndEventTriger(int& i)
     // for corresponding query.
     diff_result = osquery::diff(out_query_vector[i].old_results,
             out_query_vector[i].current_results);
-
-    // check if new rows added and master is also interested in added events
-    if((diff_result.added.size() > 0) && (event[i]=="ADD" || event[i]=="BOTH"))
+    //////////////////////////////////////////////////////////////////
+    ///////////////sending of offline logs to master intelligently////
+    //////////////////////////////////////////////////////////////////
+    if(!(diff_result.added.size() > 0) && !(diff_result.removed.size() > 0))
     {
-        //if success then send update to master
-        sendUpdateEventToMaster(diff_result.added,
-                "ADDED",i);
+        //if server is up and offline logging exists
+        if(serverUp && (offlineCount > 0))
+        {
+            for(int i=eventSent; i < (offlineCount); i++)
+            {
+               std::string tmpBrokerData = ptDb->parseAnEvent(i);
+               broker::message msg = stringToBrokerMessage(tmpBrokerData);
+               sendBrokerMessageToMaster(msg);
+               if(i == 2)
+               {
+                   break;
+               }
+            }
+            if(eventSent < offlineCount)
+            {
+                eventSent += 2;
+            }
+            else
+            {
+                osquery::remove("/tmp/offlineLogs.db");
+                ptDb->init();
+                eventSent = 0;
+                offlineCount = 0;
+            }
+        }
     }
-    // check if any rows deleted and master is also interested in removed events
-    if((diff_result.removed.size() > 0) && (event[i]=="REMOVED" || event[i]=="BOTH"))
+    else
     {
-        //if success then send update to master
-        sendUpdateEventToMaster(diff_result.removed,
-                "REMOVED",i);
+    if(serverUp)
+    {
+      // check if new rows added and master is also interested in added events
+      if((diff_result.added.size() > 0) && (event[i]=="ADD" || event[i]=="BOTH"))
+      {
+          //if success then send update to master
+          sendUpdateEventToMaster(diff_result.added,
+                  "ADDED",i);
+      }
+      // check if any rows deleted and master is also interested in removed events
+      if((diff_result.removed.size() > 0) && (event[i]=="REMOVED" || event[i]=="BOTH"))
+      {
+          //if success then send update to master
+          sendUpdateEventToMaster(diff_result.removed,
+                  "REMOVED",i);
+      }
+    }
+    else
+    {
+        // check if new rows added and master is also interested in added events
+      if((diff_result.added.size() > 0) && (event[i]=="ADD" || event[i]=="BOTH"))
+      {
+          //if success then send update to master
+          writeLogFileLocally(diff_result.added,
+                  "ADDED",i);
+      }
+      // check if any rows deleted and master is also interested in removed events
+      if((diff_result.removed.size() > 0) && (event[i]=="REMOVED" || event[i]=="BOTH"))
+      {
+          //if success then send update to master
+          writeLogFileLocally(diff_result.removed,
+                  "REMOVED",i);
+      }
     }
     out_query_vector.at(i).old_results = out_query_vector.at(i).current_results;
+    }
 }
 
 
@@ -162,7 +221,7 @@ void BrokerQueryManager::sendUpdateEventToMaster(const QueryData& temp,
         {
             msg.emplace_back(in_query_vector[iterator].event_name);
             msg.push_back(ptlocalhost->name());
-           // msg.push_back(username);
+            msg.push_back("LIVE");
             msg.push_back(event_type);
             //iterator for no of columns in corresponding query
             for(int i=0;i<qmap[iterator].size() && !handle->gotExitSignal();i++)
@@ -193,6 +252,36 @@ void BrokerQueryManager::sendUpdateEventToMaster(const QueryData& temp,
         ptmq->want_pop().clear();
     }
 }
+
+void BrokerQueryManager::sendBrokerMessageToMaster(broker::message msg)
+{
+    ptlocalhost->send(bTopic, msg);
+    msg.clear();
+    ptmq->want_pop().clear();
+}
+
+broker::message BrokerQueryManager::stringToBrokerMessage(
+         std::string fileEvent)
+ {
+     broker::message tmp;
+     fileEvent = fileEvent.substr(1,fileEvent.size()-2);
+     auto strings = lsplit(fileEvent,",");
+     for(int i=0; i<strings.size();i++)
+     {
+      //extract the value of interest
+        if(isQueryColumnInteger(strings[i]))
+        {
+            tmp.emplace_back(std::stoi(strings[i].c_str()));
+        }
+        else
+        {
+            tmp.emplace_back(strings[i]); 
+        }  
+     }
+     LOG(WARNING) << broker::to_string(tmp);
+
+    return tmp;
+ }
 
 input_query BrokerQueryManager::brokerMessageExtractor(
 const broker::message& msg)
@@ -234,6 +323,7 @@ const broker::message& msg)
         return temp;
 }
 
+ 
 bool BrokerQueryManager::ReInitializeVectors()
 {
     firstTime = true;
@@ -301,20 +391,6 @@ void BrokerQueryManager::sendErrortoBro(std::string str)
     msg.emplace_back(str);
     //send event in the form of broker message
     ptlocalhost->send(bTopic,msg);
-}
-
-void BrokerQueryManager::sendErrorBeforeGroupTopic(std::string str)
-{
-    broker::message msg;
-    //push event name, mapped at bro-side
-    msg.emplace_back("osquery::host_error");
-    // host message
-    msg.emplace_back(ptlocalhost->name());
-    //error message
-    msg.emplace_back(str);
-    //send event in the form of broker message
-    //ptlocalhost->send(bTopic,msg);
-    ptlocalhost->send("/bro/osquery/group/default",msg);
 }
 
 void BrokerQueryManager::sendReadytoBro()
@@ -403,3 +479,51 @@ bool BrokerQueryManager::getInQueryVectorStatus()
 {
     return (!in_query_vector.empty())? true: false;
 }
+
+int BrokerQueryManager::writeLogFileLocally(const QueryData& temp,
+        std::string event_type, int& iterator)
+{
+    std::string path;
+    typedef std::map<std::string, std::string>::const_reverse_iterator pt;
+    broker::message msg;
+    for (auto& r: temp )
+    {
+        if(!qmap.empty() && !handle->gotExitSignal())
+        {
+            path = in_query_vector[iterator].event_name;
+            msg.emplace_back(in_query_vector[iterator].event_name);
+            msg.push_back(ptlocalhost->name());
+            msg.push_back("OFFLINE");
+            msg.push_back(event_type);
+            //iterator for no of columns in corresponding query
+            for(int i=0;i<qmap[iterator].size() && !handle->gotExitSignal();i++)
+            {
+                // iterator for each row column
+                for(pt iter = r.rbegin(); iter != r.rend(); iter++)
+                {
+                    if(iter->first == qmap[iterator][i])
+                    {
+                        //check if column value is integer
+                        if(isQueryColumnInteger(iter->second))
+                        {
+                            msg.emplace_back(std::stoi(iter->second.c_str()));
+                        }
+                        else
+                        {
+                            msg.emplace_back(iter->second);
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            //send broker message
+            LOG(WARNING) << msg ;
+            ptDb->insertAnEvent(offlineCount++, broker::to_string(msg));
+            msg.clear();
+        }
+        ptmq->want_pop().clear();
+    }
+    /////////////////////////////////////////////////////////////////////
+}
+
