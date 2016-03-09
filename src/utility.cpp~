@@ -60,7 +60,7 @@ void SignalHandler::setExitSignal(bool _bExitSignal)
 FileReaderWriter::FileReaderWriter()
 {
     //initialize kPath with the file directory 
-    kPath = "/usr/local/etc/broker.ini";
+    kPath = "/var/osquery/broker.ini";
 }
 
 int FileReaderWriter::read()
