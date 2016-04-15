@@ -8,6 +8,7 @@ export {
 	type Info: record {
 		t: time &log;
 		host: string &log;
+		mode: string &log;
 		pid: int &log;
 		ppid: int &log;
 		path: string &log;
@@ -19,7 +20,7 @@ export {
 	};
 }
 
-event processes(host: string, utype: string,
+event processes(host: string, mode: string, utype: string,
 		pid: int, path: string, cmdline: string, uid: int, gid: int,
 		euid: int, egid: int, parent: int)
 	{
@@ -30,6 +31,7 @@ event processes(host: string, utype: string,
 	local info: Info = [
 			    $t=network_time(),
 			    $host=host,
+				$mode=mode,
 			    $pid = pid,
 			    $ppid = parent,
 			    $path = path,
@@ -49,6 +51,6 @@ event bro_init()
 	
 	local ev = [$ev=processes,
 		    $query="SELECT pid, path, cmdline, uid, gid, euid, egid, parent FROM processes"];
-	osquery::subscribe(ev);
+osquery::subscribe(ev, 0.0.0.0/0);
 	}
 

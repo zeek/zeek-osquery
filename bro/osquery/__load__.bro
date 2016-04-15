@@ -1,5 +1,10 @@
-
 @load ./main
-@load ./processes
-@load ./sockets
-@load ./usb
+@load ./firefox_addons 
+@load ./kernel_integrity 
+@load ./listening_ports 
+@load ./logged_in_users 
+@load ./processes 
+@load ./process_open_files 
+@load ./process_open_sockets 
+@load ./shell_history 
+@load ./usb_devices 

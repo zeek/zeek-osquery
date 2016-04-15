@@ -113,8 +113,10 @@ export {
 # Sent by us to the client for subscribing to an event.
 global host_subscribe: event(ev: string, query: string, utype: string, initdump: bool);
 
+
 # Sent by us to the client for unsubscribing from an event.
 global host_unsubscribe: event(ev: string, query: string, utype: string, initdump: bool);
+
 
 # Sent by us to set the topic for the client to publish its events with.
 global host_set_topic: event(topic: string);
@@ -309,8 +311,6 @@ event BrokerComm::incoming_connection_established(peer_name: string)
 	{
 	log_peer("info", peer_name, "incoming connection established");
 
-	print peer_name;
-	
 	local ip = to_addr(peer_name);
 
 	local ours = F;
