@@ -10,6 +10,8 @@
  */
 
 #pragma once
+#include <sys/time.h>
+#include <csignal>
 #include "BrokerQueryManager.h"
 #include "utility.h"
 
@@ -25,7 +27,7 @@ private:
     //broker port for listening connection
     int bPort;
     // connection state tracking variable
-    bool connected;
+    static bool connected;
     // BrokerQueryManager pointer for processing query and generating
     // its response
     BrokerQueryManager* qm;
@@ -37,6 +39,12 @@ private:
     pollfd* ptpfd;
     //peer name 
     broker::peering peer;
+    //timer interval in hours variable
+    int offlineLoggingTimerInterval;
+    // itimerval constructor to set initial value for timer.
+    struct itimerval loggingTimer;
+    //variable to check if offline logging timer has expired or has not
+    static bool isOffLoggingTimerEvent;
 public:
     /**
      *  @brief Class constructor
@@ -44,10 +52,10 @@ public:
      *  @param hostName local host name
      *  @param btp Broker topic used to send messages to interested peers
      *  @param bport Broker connection port used while listening
-     * 
+     *  @param loggingTime offline logging interval in hours
      */ 
      BrokerConnectionManager(std::string hostName,std::string btp,
-             int bport=9999);
+             int bport=9999, float loggingTime=-1);
      
     //Class Destructor to delete pointed objects
     ~BrokerConnectionManager();
@@ -148,6 +156,32 @@ public:
      */
     void closeBrokerConnection();
     
+    /**
+     * @brief initializes the timer structure for offline logging with an 
+     * initial value read from broker.ini file.
+     * @param interval variable holding time in hours 
+     */
+    void setupTimerInterval(int interval);
+    
+    /**
+     * @brief This function will run the timer for one time only. For control
+     * you need to call it manually where required. We are calling it when 
+     * connection is broken.
+     */
+    void initializeTimer();
+    
+    /**
+     * @brief Timer signal handler function. We are setting the static variable
+     * that will be checked later to process actions based on that event.
+     * @signum signal value passed by signal generator
+     */
+    static void processTimerEvent(int signum);
+    
+    /**
+     * 
+     * @return offline logging timer state is returned
+     */
+    bool getLoggingPermission();
 };
 
 

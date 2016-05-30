@@ -118,6 +118,8 @@ private:
     std::string retryInterval;
     //timer interval in millsec
     std::string timerInterval;
+    //offline logging time
+    std::string offlineLoggingInterval;
 public:
     /**
      * @brief Default Constructor to initialize kPath with default path
@@ -164,10 +166,10 @@ public:
      * @brief Returns connection retry interval
      * This field is necessary in a sense that there will be number of client 
      * trying to connect with master. If in case, master is down then connection
-     * attempt will generate a lot of trafic. So to minimize probing trafic 
+     * attempt will generate a lot of traffic. So to minimize probing traffic 
      * this field  is used as control variable.
      * 
-     * @return Returns retryInterval.
+     * @return Returns retryInterval variable value.
      */
     std::string getRetryInterval();
     
@@ -178,6 +180,13 @@ public:
      * @return Returns timerInterval.
      */
     std::string getTimerInterval();
+    
+    /**
+     * @brief Returns the offline logging time. -1 is for forever 
+     * 
+     * @return Returns offlineLoggingInterval variable.
+     */
+    std::string getOfflineLoggingInterval();
 };
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////

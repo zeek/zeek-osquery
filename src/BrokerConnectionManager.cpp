@@ -11,11 +11,11 @@
 
 #include "BrokerConnectionManager.h"
 
-
-
+bool BrokerConnectionManager::isOffLoggingTimerEvent = false;
+bool BrokerConnectionManager::connected = false;
 
 BrokerConnectionManager::BrokerConnectionManager(std::string hostName,
-        std::string btp,int bport)
+        std::string btp,int bport, float loggingTime)
 {
     if ( ! btp.size() || btp[btp.size() - 1] != '/' )
 	btp += "/";
@@ -34,6 +34,8 @@ BrokerConnectionManager::BrokerConnectionManager(std::string hostName,
     ptpfd = new pollfd{ptmq->fd(), POLLIN, 0};
     // Query Manager Object
     qm = new BrokerQueryManager(ptlocalhost,ptmq,btp);
+    //initialize offline logging interval
+    setupTimerInterval(loggingTime);
 }
 
 BrokerConnectionManager::~BrokerConnectionManager()
@@ -51,11 +53,8 @@ BrokerConnectionManager::~BrokerConnectionManager()
 bool BrokerConnectionManager::connectToMaster(std::string master_ip,
         std::chrono::duration<double> retry_interval, SignalHandler* handler)
 {
-    //LOG(WARNING) <<"Connecting to Master at "<<master_ip ;
     connected = false;
-    //peer = ptlocalhost->peer(master_ip,bPort);
-    //while(!connected && !(handler->gotExitSignal()))
-    //{
+    
         auto conn_status = 
         ptlocalhost->outgoing_connection_status().want_pop();
         
@@ -63,12 +62,12 @@ bool BrokerConnectionManager::connectToMaster(std::string master_ip,
         {
             if(cs.status == broker::outgoing_connection_status::tag::established)
             {
+                BrokerConnectionManager::isOffLoggingTimerEvent = false;
                 LOG(WARNING) <<"Connection Established";
                 connected = true;
                 break;
             }
         }
-   // }
     return connected;
 }
 
@@ -126,7 +125,8 @@ int BrokerConnectionManager::trackResponseChangesAndSendResponseToMaster(
     //send a pointer to signal handler object created in main.cpp
     qm->setSignalHandle(handle);
     // start tracking updates
-    qm->queriesUpdateTrackingHandler(isConnectionAlive());
+    qm->queriesUpdateTrackingHandler(isConnectionAlive(), 
+            getLoggingPermission());
     
     return SUCCESS;
 }
@@ -173,6 +173,55 @@ void BrokerConnectionManager::setBrokerPeering(std::string master_ip)
 
 void BrokerConnectionManager::closeBrokerConnection()
 {
+    //initialize the timer
+    //initializeTimer();
     ptlocalhost->unpeer(peer);
     connected = false;
+}
+
+void BrokerConnectionManager::setupTimerInterval(int interval)
+{
+    if(interval == -1)
+    {
+        loggingTimer.it_value.tv_usec = 0;
+    }
+    else
+    {
+    /* Configure the timer to expire after interval msec... */
+    loggingTimer.it_value.tv_sec = 0;
+    loggingTimer.it_value.tv_usec = (interval * 1000);
+    loggingTimer.it_interval.tv_sec = 0;
+    loggingTimer.it_interval.tv_usec = 0;    
+    }
+}
+
+void BrokerConnectionManager::initializeTimer()
+{
+     struct sigaction sa;
+     
+     /* Install timer_handler as the signal handler for SIGVTALRM. */
+     memset (&sa, 0, sizeof (sa));
+     sa.sa_handler = &(BrokerConnectionManager::processTimerEvent);
+     sigaction (SIGVTALRM, &sa, NULL);
+    
+     /* Start a virtual timer. It counts down whenever this process is
+       executing. */
+     if(loggingTimer.it_value.tv_usec != 0)
+     {
+         LOG(WARNING) << "Offline Logging started for " << 
+                 (loggingTimer.it_value.tv_usec/1000) << " Minutes";
+        setitimer (ITIMER_VIRTUAL, &loggingTimer, NULL);    
+     }
+}
+
+void BrokerConnectionManager::processTimerEvent(int signum)
+{
+    if(!connected)
+    {
+        BrokerConnectionManager::isOffLoggingTimerEvent = true; 
+    }
+}
+bool BrokerConnectionManager::getLoggingPermission()
+{
+    return isOffLoggingTimerEvent;
 }

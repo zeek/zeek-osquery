@@ -51,12 +51,12 @@ int StateMachine::initializeStateMachine()
        //initialize the timer with timer_interval after reading broker.ini
       timerInterval = std::atoi(fileReader.getTimerInterval().c_str());
       setupTimerInterval(timerInterval);
-      
       // if reading is successful
       // then make a broker connection manager object
-      ptBCM = new BrokerConnectionManager(getLocalHostIp(),
+      ptBCM = new BrokerConnectionManager(fileReader.getHostName(),
           fileReader.getBrokerTopic(),
-          std::atoi(fileReader.getBrokerConnectionPort().c_str()));
+          std::atoi(fileReader.getBrokerConnectionPort().c_str()),
+             std::atoi(fileReader.getOfflineLoggingInterval().c_str()) );
     
     connectionCount = true;
     }
@@ -74,7 +74,6 @@ int StateMachine::initializeStateMachine()
       connectionResponse = ptBCM->connectToMaster(fileReader.getMasterIp()
               ,std::chrono::duration<double>
       (std::atoi(fileReader.getRetryInterval().c_str())), signalHandler);
-      
       //if timer event occurs
       if(isTimerEvent)
       {
@@ -265,10 +264,13 @@ int StateMachine::doActionsForHostSubscribeEvent(broker::message msg)
     {
         //try extracting broker::message
         inString = ptBCM->getQueryManagerPointer()->brokerMessageExtractor(msg);
+        if(inString.query != "RunTime" )
+        {
         //if extraction is successful then add that query to local query vector
         ptBCM->getQueryManagerPointer()->addNewQueries(inString);
         //process queries
         statusCode = processMasterQuery();
+        }
         
     }
     catch(std::string e)
@@ -572,6 +574,7 @@ int StateMachine::Run()
             
             //if disconnected then break the connection.
             LOG(WARNING) <<"Connection Broken";
+            ptBCM->closeBrokerConnection();
             
             if(signalHandler->gotExitSignal())
             {

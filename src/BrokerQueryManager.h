@@ -21,7 +21,9 @@
 #include <iostream>
 #include <unistd.h>
 #include <vector>
+#include <ctime>
 #include "utility.h"
+#include "../aux/sql_parser/lexer.h"
 
 
 
@@ -40,7 +42,7 @@ struct input_query
     std::string query;
     // flag to send initial dump, default is false
     bool flag;
-    //event type rather it is "ADD" or "REMOVED"
+    //event type rather it is "ADD" or "REMOVED" or "BOTH"
     std::string ev_type;
     //subscribed or un-subscribed
     bool sub_type;
@@ -159,8 +161,9 @@ public:
      *  tracks update in given queries tables: till the broker connection
      *  is up.
      *  @param serverUp flag to check if the server is online
+     *  @param logging flag to check if offline logging timer expired.
      */ 
-    void queriesUpdateTrackingHandler(bool serverUp);
+    void queriesUpdateTrackingHandler(bool serverUp, bool logging);
     
     
     /**
@@ -180,8 +183,9 @@ public:
      *  @param iterator to indicate query for which we need to calculate
      *  difference.
      *  @param serverUp flag to check if the server is online
+     *  @param logging flag to check if offline logging timer expired.
      */
-    void diffResultsAndEventTriger(int& i, bool serverUp);
+    void diffResultsAndEventTriger(int& i, bool serverUp, bool logging);
     
    /**    
     * @brief Sends update events to master in the form of broker::messages
@@ -194,6 +198,15 @@ public:
     void sendUpdateEventToMaster(const QueryData& temp, std::string event_type,
         int& iterator);
     
+    /**    
+    * @brief Sends live query events to master in the form of broker::messages
+    *
+    * @param temp QueryData containing the query results
+    * @param tmpqc queries columns information corresponding to current query
+    * @param evType event type (ADD, REMOVED, BOTH)--not used
+    */
+    void sendLiveQueryToMaster(const QueryData& temp, query_columns tmpqc,
+            std::string evType);
     /**
     * @brief Extracts event name, type and SQL query form Broker Message.
     * Processes the input broker::message and builds an input_query structure
@@ -331,7 +344,13 @@ public:
     int writeLogFileLocally(const QueryData& temp,
         std::string event_type, int& iterator);
     
-    
+    /**
+     * This function fetches local machine time using standard time library
+     * and then returns it in std::string format.
+     * 
+     * @return returns the local machine time in string format 
+     */
+    std::string ltime();
 };
 
 

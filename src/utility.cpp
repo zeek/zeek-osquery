@@ -60,7 +60,7 @@ void SignalHandler::setExitSignal(bool _bExitSignal)
 FileReaderWriter::FileReaderWriter()
 {
     //initialize kPath with the file directory 
-    kPath = "/usr/local/etc/broker.ini";
+    kPath = "/var/osquery/broker.ini";
 }
 
 int FileReaderWriter::read()
@@ -76,9 +76,14 @@ int FileReaderWriter::read()
         //if file not empty
         if(s.ok())
         {
-            std::string temp[6];
+            std::string temp[7];
             //split into lines
             auto strings = lsplit(content,"\n");
+            if(strings.size() != 7)
+            {
+                LOG(ERROR) << "ini file arguments mismatch";
+                return -1;
+            }
             for(int i=0; i<strings.size();i++)
             {
                 //extract the value of interest
@@ -109,8 +114,12 @@ int FileReaderWriter::read()
                 {
                     timerInterval = temp[i];
                 }
+                else if(sp[0] == "offline_logging_interval")
+                {
+                    offlineLoggingInterval = temp[i];
+                }
                 else
-                    LOG(WARNING) << "Illegal content " << " in broker.ini";
+                    LOG(WARNING) << sp[0] << " is not allowed in broker.ini";
                 
             }
         }
@@ -165,6 +174,10 @@ std::string FileReaderWriter::getTimerInterval()
     return timerInterval;
 }
 
+std::string FileReaderWriter::getOfflineLoggingInterval()
+{
+    return offlineLoggingInterval;
+}
 /*
  * End of FileReaderWriter Class member functions
  */
@@ -357,7 +370,7 @@ std::vector<std::string> lsplit(const std::string& s,
   }
   // Join the optional accumulator.
   if (accumulator.size() > 0) {
-    elems.push_back(boost::join(accumulator, delim));
+    elems.push_back(join(accumulator, delim));
   }
   return elems;
 }

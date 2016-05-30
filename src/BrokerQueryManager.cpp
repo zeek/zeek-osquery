@@ -50,6 +50,10 @@ bool BrokerQueryManager::getEventsFromBrokerMessage()
 
 bool BrokerQueryManager::queryColumnExtractor()
 {
+    //object to hold parsing result
+    sqlselect sqlResult;
+    //parser object
+    SqlLexer parser;
     LOG(WARNING) << "Current Queries";
     if(!qmap.empty())
     {
@@ -59,20 +63,22 @@ bool BrokerQueryManager::queryColumnExtractor()
     for(int i=0;i<in_query_vector.size();i++)
     {
         input_query print = in_query_vector.at(i);
+        print.query.push_back(';');
         LOG(WARNING) <<print.query;
+        char buffer[print.query.size()];
+        std::strcpy(buffer,print.query.c_str());
         // Extracts the columns in query using lsplit function
-        for(auto& c1: lsplit(print.query,"SELECT"))
+        sql_token t = parser.lexer_select(buffer, &sqlResult);
+        if(t!= TOK_TERMINATOR)
         {
-            for(auto& c2: lsplit(c1,"FROM"))
-            {
-                for(auto& c3: lsplit(c2,","))
-                {
-                    qc.push_back(c3);
-                }
-                break;
-            }
-            break;
+            LOG(ERROR) << "Parsing Error: Send proper string";
+            this->sendErrortoBro("Parsing Error: Send proper string");
         }
+        for(int j=0; j<sqlResult.getColumns().size(); j++)
+        {
+            qc.push_back(sqlResult.getColumns().at(j).name);
+        }
+        
         // stores the corresponding query columns
         qmap.insert(query_columns_map::value_type(i,qc));
         qc.clear();
@@ -109,11 +115,11 @@ bool BrokerQueryManager::queryDataResultVectorInit()
     return (!out_query_vector.empty()) ? true: false;
 }
 
-void BrokerQueryManager::queriesUpdateTrackingHandler(bool serverUp)
+void BrokerQueryManager::queriesUpdateTrackingHandler(bool serverUp,bool logging)
 {
     for(int i=0;i<out_query_vector.size();i++)
     {
-        BrokerQueryManager::diffResultsAndEventTriger(i,serverUp);
+        BrokerQueryManager::diffResultsAndEventTriger(i,serverUp, logging);
     }
 
 }
@@ -129,7 +135,8 @@ QueryData BrokerQueryManager::getQueryResult(const std::string& queryString)
     return qd;
 }
 
-void BrokerQueryManager::diffResultsAndEventTriger(int& i, bool serverUp)
+void BrokerQueryManager::diffResultsAndEventTriger(int& i, bool serverUp,
+        bool logging)
 {
     out_query_vector[i].current_results =
             getQueryResult(in_query_vector[i].query);
@@ -146,12 +153,14 @@ void BrokerQueryManager::diffResultsAndEventTriger(int& i, bool serverUp)
         //if server is up and offline logging exists
         if(serverUp && (offlineCount > 0))
         {
+            int tmp = 0;
             for(int i=eventSent; i < (offlineCount); i++)
             {
                std::string tmpBrokerData = ptDb->parseAnEvent(i);
                broker::message msg = stringToBrokerMessage(tmpBrokerData);
                sendBrokerMessageToMaster(msg);
-               if(i == 2)
+               tmp++;
+               if(tmp == 2)
                {
                    break;
                }
@@ -188,8 +197,9 @@ void BrokerQueryManager::diffResultsAndEventTriger(int& i, bool serverUp)
                   "REMOVED",i);
       }
     }
-    else
+    else if(!serverUp && !logging)
     {
+        LOG(WARNING) << logging;
         // check if new rows added and master is also interested in added events
       if((diff_result.added.size() > 0) && (event[i]=="ADD" || event[i]=="BOTH"))
       {
@@ -220,8 +230,8 @@ void BrokerQueryManager::sendUpdateEventToMaster(const QueryData& temp,
         if(!qmap.empty() && !handle->gotExitSignal())
         {
             msg.emplace_back(in_query_vector[iterator].event_name);
+            msg.push_back(ltime());
             msg.push_back(ptlocalhost->name());
-            msg.push_back("LIVE");
             msg.push_back(event_type);
             //iterator for no of columns in corresponding query
             for(int i=0;i<qmap[iterator].size() && !handle->gotExitSignal();i++)
@@ -251,6 +261,49 @@ void BrokerQueryManager::sendUpdateEventToMaster(const QueryData& temp,
         }
         ptmq->want_pop().clear();
     }
+}
+
+void BrokerQueryManager::sendLiveQueryToMaster(const QueryData& temp, 
+        query_columns tmpqc, std::string evType)
+{
+ typedef std::map<std::string, std::string>::const_reverse_iterator pt;
+    broker::message msg;
+    for (auto& r: temp )
+    {
+        if( !handle->gotExitSignal())
+        {
+            msg.emplace_back(evType);
+            msg.push_back(ltime());
+            msg.push_back(ptlocalhost->name());
+            msg.push_back("Live");
+            //iterator for no of columns in corresponding query
+            for(int i=0;i<tmpqc.size() && !handle->gotExitSignal();i++)
+            {
+                // iterator for each row column
+                for(pt iter = r.rbegin(); iter != r.rend(); iter++)
+                {
+                    if(iter->first == tmpqc[i])
+                    {
+                        //check if column value is integer
+                        if(isQueryColumnInteger(iter->second))
+                        {
+                            msg.emplace_back(std::stoi(iter->second.c_str()));
+                        }
+                        else
+                        {
+                            msg.emplace_back(iter->second);
+                        }
+                        break;
+                    }
+                }
+            }
+            //send broker message
+            LOG(WARNING) << msg;
+            ptlocalhost->send(bTopic, msg);
+            msg.clear();
+        }
+        ptmq->want_pop().clear();
+    }   
 }
 
 void BrokerQueryManager::sendBrokerMessageToMaster(broker::message msg)
@@ -289,30 +342,75 @@ const broker::message& msg)
     input_query temp;
     
     auto ev = broker::to_string(msg[0]);
-
+    
     if ((ev != "osquery::host_subscribe") == (ev != "osquery::host_unsubscribe"))
     {
         throw(std::string("unexpected event ") + ev);
     }
     
-    if( msg.size() != 5 )
+    if( (ev == "osquery::host_subscribe") && msg.size() == 6 )
     {
-        throw(std::string("No of arguments wrong" + msg.size()));
+        if(broker::to_string(msg[4]) == "1")
+        {
+            std::string query = broker::to_string(msg[2]);
+            query.push_back(';');
+            ////////////////////////////////////////////////
+            query_columns tqc;
+            //object to hold parsing result
+            sqlselect sqlResult;
+            //parser object
+            SqlLexer parser;
+            char buffer[query.size()];
+            std::strcpy(buffer,query.c_str());
+            sql_token t = parser.lexer_select(buffer, &sqlResult);
+            if(t!= TOK_TERMINATOR)
+            {
+                this->sendErrortoBro("Parsing Error: Send proper string");
+            }
+            for(int i=0; i<sqlResult.getColumns().size(); i++)
+            {
+             tqc.push_back(sqlResult.getColumns().at(i).name);
+            }
+            
+            ////////////////////////////////////////////////
+            QueryData  tmp = getQueryResult(query);
+            this->sendLiveQueryToMaster(tmp,tqc,broker::to_string(msg[3]));
+            temp.query = "RunTime";
+            return temp;
+        }
+        else
+        {
+            //event name
+            temp.event_name = broker::to_string(msg[1]);
+            //returns the query  string
+            temp.query = broker::to_string(msg[2]);
+            //correct the formating
+            temp.query = formateSqlString(temp.query);
+            //event type "ADD", "REMOVE" or "BOTH"
+            temp.ev_type = broker::to_string(msg[3]);
+            std::transform(temp.ev_type.begin(), temp.ev_type.end(),
+                    temp.ev_type.begin(), ::toupper);
+            temp.flag = (broker::to_string(msg[5]) == "1")?true:false;
+        }
     }
-    //At start there would be only subscription msgs.
-    //temp.sub_type = (ev == "osquery::host_subscribe")?true:false;
-    //event name
-    temp.event_name = broker::to_string(msg[1]);
-    //returns the query  string
-    temp.query = broker::to_string(msg[2]);
-    //correct the formating
-    temp.query = formateSqlString(temp.query);
-    //event type "ADD", "REMOVE" or "BOTH"
-    temp.ev_type = broker::to_string(msg[3]);
-    std::transform(temp.ev_type.begin(), temp.ev_type.end(),
-            temp.ev_type.begin(), ::toupper);
-    temp.flag = (broker::to_string(msg[4]) == "1")?true:false;
-
+    else if((ev == "osquery::host_subscribe") && msg.size() == 5)
+    {
+        //event name
+        temp.event_name = broker::to_string(msg[1]);
+        //returns the query  string
+        temp.query = broker::to_string(msg[2]);
+        //correct the formating
+        temp.query = formateSqlString(temp.query);
+        //event type "ADD", "REMOVE" or "BOTH"
+        temp.ev_type = broker::to_string(msg[3]);
+        std::transform(temp.ev_type.begin(), temp.ev_type.end(),
+                temp.ev_type.begin(), ::toupper);
+        temp.flag = (broker::to_string(msg[4]) == "1")?true:false;
+    }
+    else
+    {
+        throw(std::string("unexpected event ") + ev);
+    }
     //will throw an exception if query is not a proper SQL string
     if(temp.query.substr(0,6)!= "SELECT")
     {
@@ -483,17 +581,15 @@ bool BrokerQueryManager::getInQueryVectorStatus()
 int BrokerQueryManager::writeLogFileLocally(const QueryData& temp,
         std::string event_type, int& iterator)
 {
-    std::string path;
     typedef std::map<std::string, std::string>::const_reverse_iterator pt;
     broker::message msg;
     for (auto& r: temp )
     {
         if(!qmap.empty() && !handle->gotExitSignal())
         {
-            path = in_query_vector[iterator].event_name;
             msg.emplace_back(in_query_vector[iterator].event_name);
+            msg.push_back(ltime());
             msg.push_back(ptlocalhost->name());
-            msg.push_back("OFFLINE");
             msg.push_back(event_type);
             //iterator for no of columns in corresponding query
             for(int i=0;i<qmap[iterator].size() && !handle->gotExitSignal();i++)
@@ -527,3 +623,12 @@ int BrokerQueryManager::writeLogFileLocally(const QueryData& temp,
     /////////////////////////////////////////////////////////////////////
 }
 
+std::string BrokerQueryManager::ltime()
+{
+    // current date/time based on current system
+   time_t now = time(0);
+   // convert now to string form
+   char* dt = ctime(&now);
+   
+   return std::string(dt);
+}
