@@ -9,7 +9,7 @@ project(bro-osquery)
 set(TARGET bro-osquery)
 
 find_package(Libcaf COMPONENTS core io REQUIRED)
-find_package(Bro REQUIRED)
+#find_package(Bro REQUIRED)
 find_package(Broker REQUIRED)
 find_package(Osquery REQUIRED)
 find_package(Glog REQUIRED)
@@ -50,6 +50,8 @@ set(SRCS
     src/main.cpp
     src/StateMachine.cpp
     src/utility.cpp
+	aux/sql_parser/sqlselect.cpp
+	aux/sql_parser/lexer.cpp
 )
 
 set(BROKER_INI_PATH "${CMAKE_INSTALL_PREFIX}/etc/broker.ini")
