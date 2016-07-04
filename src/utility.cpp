@@ -370,7 +370,7 @@ std::vector<std::string> lsplit(const std::string& s,
   }
   // Join the optional accumulator.
   if (accumulator.size() > 0) {
-    elems.push_back(join(accumulator, delim));
+    elems.push_back(boost::algorithm::join(accumulator, delim));
   }
   return elems;
 }

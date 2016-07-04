@@ -14,13 +14,12 @@
 
 #include <string>
 #include <iostream>
-#include <osquery/events.h>
-#include <osquery/sql.h>
-#include <osquery/sdk.h>
-#include <osquery/registry.h>
 #include <sstream>
 #include <csignal>
 #include <sys/time.h>
+
+#include <osquery/sdk.h>
+
 #include "BrokerConnectionManager.h"
 #include "BrokerQueryManager.h"
 #include "BrokerQueryPlugin.h"
