@@ -5,6 +5,9 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 
 project(bro-osquery)
 
+set(CMAKE_C_COMPILER "/usr/bin/clang")
+set(CMAKE_CXX_COMPILER "/usr/bin/clang++")
+
 # Name of extension.
 set(TARGET bro-osquery)
 
@@ -20,7 +23,6 @@ include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(BEFORE ${CMAKE_BINARY_DIR}/src)
 
 set(LINK_LIBS ${LINK_LIBS} ${LIBCAF_LIBRARIES} ${BROKER_LIBRARY} ${OSQUERY_LIBRARY} ${GLOG_LIBRARY})
-
 set(CMAKE_CXX_FLAGS "-I ${BROKER_INCLUDE_DIR} -I ${OSQUERY_INCLUDE_DIR} -I ${GLOG_INCLUDE_DIR} ${CMAKE_CXX_FLAGS}")
 
 include(RequireCXX11)
@@ -28,10 +30,10 @@ include(InstallClobberImmune)
 
 # Platform specifics.
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    set(LINK_LIBS ${LINK_LIBS} "-lpthread")
+  set(LINK_LIBS ${LINK_LIBS} "-lpthread")
 
-    # TODO: Better ways to handle these?
-    set(LINK_LIBS ${LINK_LIBS} "-lboost_thread -lboost_system -lboost_filesystem -lthrift -lcrypto -ldl -lglog -lthriftz -lgflags -lrocksdb_lite -lz -lbz2 -lsnappy")
+ # TODO: Better ways to handle these?
+	set(LINK_LIBS ${LINK_LIBS} "-lboost_thread -lboost_system -lboost_filesystem -lthrift -lcrypto -ldl -lglog -lthriftz -lgflags -lrocksdb -lz -lbz2 -lsnappy")
 
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
     message(FATAL_ERROR "FreeBSD not yet tried.")
@@ -50,8 +52,8 @@ set(SRCS
     src/main.cpp
     src/StateMachine.cpp
     src/utility.cpp
-	aux/sql_parser/sqlselect.cpp
-	aux/sql_parser/lexer.cpp
+		aux/sql_parser/sqlselect.cpp
+		aux/sql_parser/lexer.cpp
 )
 
 set(BROKER_INI_PATH "${CMAKE_INSTALL_PREFIX}/etc/broker.ini")
