@@ -5,11 +5,23 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 
 project(bro-osquery)
 
-set(CMAKE_C_COMPILER "/usr/bin/clang")
-set(CMAKE_CXX_COMPILER "/usr/bin/clang++")
-
 # Name of extension.
 set(TARGET bro-osquery)
+
+# If no explicit compiler override and clang++ exists, prefer clang.
+find_file(CLANGXX_EXISTS "clang++")
+if(DEFINED ENV{CC})
+  set(CMAKE_C_COMPILER "$ENV{CC}")
+  LOG("Overriding C compiler from clang to $ENV{CC}")
+elseif(CLANGXX_EXISTS)
+  set(CMAKE_C_COMPILER "clang")
+endif()
+if(DEFINED ENV{CXX})
+  set(CMAKE_CXX_COMPILER "$ENV{CXX}")
+  LOG("Overriding CXX compiler from clang++ to $ENV{CXX}")
+elseif(CLANGXX_EXISTS)
+  set(CMAKE_CXX_COMPILER "clang++")
+endif()
 
 find_package(Libcaf COMPONENTS core io REQUIRED)
 #find_package(Bro REQUIRED)
@@ -23,7 +35,7 @@ include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(BEFORE ${CMAKE_BINARY_DIR}/src)
 
 set(LINK_LIBS ${LINK_LIBS} ${LIBCAF_LIBRARIES} ${BROKER_LIBRARY} ${OSQUERY_LIBRARY} ${GLOG_LIBRARY})
-set(CMAKE_CXX_FLAGS "-I ${BROKER_INCLUDE_DIR} -I ${OSQUERY_INCLUDE_DIR} -I ${GLOG_INCLUDE_DIR} ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-fPIC -I ${BROKER_INCLUDE_DIR} -I ${OSQUERY_INCLUDE_DIR} -I ${GLOG_INCLUDE_DIR} ${CMAKE_CXX_FLAGS}")
 
 include(RequireCXX11)
 include(InstallClobberImmune)
