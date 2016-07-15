@@ -1,4 +1,3 @@
-
 cmake_minimum_required(VERSION 2.8)
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
@@ -9,22 +8,21 @@ project(bro-osquery)
 set(TARGET bro-osquery)
 
 # If no explicit compiler override and clang++ exists, prefer clang.
-find_file(CLANGXX_EXISTS "clang++")
-if(DEFINED ENV{CC})
-  set(CMAKE_C_COMPILER "$ENV{CC}")
-  LOG("Overriding C compiler from clang to $ENV{CC}")
-elseif(CLANGXX_EXISTS)
-  set(CMAKE_C_COMPILER "clang")
-endif()
-if(DEFINED ENV{CXX})
-  set(CMAKE_CXX_COMPILER "$ENV{CXX}")
-  LOG("Overriding CXX compiler from clang++ to $ENV{CXX}")
-elseif(CLANGXX_EXISTS)
-  set(CMAKE_CXX_COMPILER "clang++")
-endif()
+#find_file(CLANGXX_EXISTS "clang++")
+#if(DEFINED ENV{CC})
+	#set(CMAKE_C_COMPILER "$ENV{CC}")
+	#LOG("Overriding C compiler from clang to $ENV{CC}")
+#elseif(CLANGXX_EXISTS)
+	#set(CMAKE_C_COMPILER "clang")
+#endif()
+#if(DEFINED ENV{CXX})
+	#set(CMAKE_CXX_COMPILER "$ENV{CXX}")
+	#LOG("Overriding CXX compiler from clang++ to $ENV{CXX}")
+#elseif(CLANGXX_EXISTS)
+	#set(CMAKE_CXX_COMPILER "clang++")
+#endif()
 
 find_package(Libcaf COMPONENTS core io REQUIRED)
-#find_package(Bro REQUIRED)
 find_package(Broker REQUIRED)
 find_package(Osquery REQUIRED)
 find_package(Glog REQUIRED)
@@ -34,18 +32,17 @@ include_directories(BEFORE ${OSQUERY_INCLUDE_DIRS})
 include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(BEFORE ${CMAKE_BINARY_DIR}/src)
 
-set(LINK_LIBS ${LINK_LIBS} ${LIBCAF_LIBRARIES} ${BROKER_LIBRARY} ${OSQUERY_LIBRARY} ${GLOG_LIBRARY})
-set(CMAKE_CXX_FLAGS "-fPIC -I ${BROKER_INCLUDE_DIR} -I ${OSQUERY_INCLUDE_DIR} -I ${GLOG_INCLUDE_DIR} ${CMAKE_CXX_FLAGS}")
+set(LINK_LIBS ${LINK_LIBS} ${BROKER_LIBRARY} ${LIBCAF_LIBRARIES} ${OSQUERY_LIBRARY} ${GLOG_LIBRARY})
+
+set(CMAKE_CXX_FLAGS "-I ${BROKER_INCLUDE_DIR} -I ${OSQUERY_INCLUDE_DIR} -I ${GLOG_INCLUDE_DIR} ${CMAKE_CXX_FLAGS}")
 
 include(RequireCXX11)
 include(InstallClobberImmune)
 
 # Platform specifics.
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-  set(LINK_LIBS ${LINK_LIBS} "-lpthread")
-
- # TODO: Better ways to handle these?
-	set(LINK_LIBS ${LINK_LIBS} "-lboost_thread -lboost_system -lboost_filesystem -lthrift -lcrypto -ldl -lglog -lthriftz -lgflags -lrocksdb -lz -lbz2 -lsnappy")
+	set(LINK_LIBS ${LINK_LIBS} "-L /usr/local/lib")
+	set(LINK_LIBS ${LINK_LIBS} "-lbroker -lcrypto -lssl -lreadline -lncurses -lpthread -lbz2 -lz -lsnappy -ldl -lrt -lthrift -lgflags -lglog -lboost_system -lboost_filesystem -lboost_regex -lyara")
 
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
     message(FATAL_ERROR "FreeBSD not yet tried.")
