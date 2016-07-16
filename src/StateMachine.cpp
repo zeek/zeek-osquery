@@ -178,7 +178,7 @@ int StateMachine::processEventsInWaitForTopicState(int ev,
             std::ostringstream stringStream;
             stringStream << eventToString(ev) << " is not allowed in " <<
                     "WAIT_FOR_TOPIC" << "expecting group topic events";
-            LOG(WARNING) << stringStream;
+            LOG(WARNING) << stringStream.str();
             ptBCM->getQueryManagerPointer()->
                 sendErrortoBro(stringStream.str());
         }
@@ -247,7 +247,7 @@ int StateMachine::processEventsInGetAndProcessQueriesState(int ev,
             std::ostringstream stringStream;
             stringStream << eventToString(ev) << " is not allowed in " <<
                   "GET_AND_PROCESS_QUERIES " << "expecting subscription events";
-            LOG(WARNING) << stringStream;
+            LOG(WARNING) << stringStream.str();
             ptBCM->getQueryManagerPointer()->
                 sendErrortoBro(stringStream.str());
         }

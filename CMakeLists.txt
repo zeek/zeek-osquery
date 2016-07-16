@@ -31,7 +31,6 @@ include_directories(BEFORE ${BROKER_INCLUDE_DIRS})
 include_directories(BEFORE ${OSQUERY_INCLUDE_DIRS})
 include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(BEFORE ${CMAKE_BINARY_DIR}/src)
-
 set(LINK_LIBS ${LINK_LIBS} ${BROKER_LIBRARY} ${LIBCAF_LIBRARIES} ${OSQUERY_LIBRARY} ${GLOG_LIBRARY})
 
 set(CMAKE_CXX_FLAGS "-I ${BROKER_INCLUDE_DIR} -I ${OSQUERY_INCLUDE_DIR} -I ${GLOG_INCLUDE_DIR} ${CMAKE_CXX_FLAGS}")
@@ -42,7 +41,7 @@ include(InstallClobberImmune)
 # Platform specifics.
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 	set(LINK_LIBS ${LINK_LIBS} "-L /usr/local/lib")
-	set(LINK_LIBS ${LINK_LIBS} "-lbroker -lcrypto -lssl -lreadline -lncurses -lpthread -lbz2 -lz -lsnappy -ldl -lrt -lthrift -lgflags -lglog -lboost_system -lboost_filesystem -lboost_regex -lyara")
+	set(LINK_LIBS ${LINK_LIBS} "-lcrypto -lssl -lreadline -lbz2 -lz -lpthread -ldl -lrt -lthrift -lgflags -lglog -lboost_system -lboost_filesystem -lboost_regex -lrocksdb -lyara")
 
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
     message(FATAL_ERROR "FreeBSD not yet tried.")
