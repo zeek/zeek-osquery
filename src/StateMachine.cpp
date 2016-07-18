@@ -183,6 +183,7 @@ int StateMachine::processEventsInWaitForTopicState(int ev,
                 sendErrortoBro(stringStream.str());
         }
     };
+  return SUCCESS;
 }
 
 int StateMachine::doActionsForGroupTopicEvent(broker::message msg)
@@ -252,7 +253,7 @@ int StateMachine::processEventsInGetAndProcessQueriesState(int ev,
                 sendErrortoBro(stringStream.str());
         }
     };
-    
+    return SUCCESS;
 }
 
 int StateMachine::doActionsForHostSubscribeEvent(broker::message msg)
@@ -493,6 +494,7 @@ int StateMachine::doActionsForTimerEvent()
     {
         setitimer (ITIMER_VIRTUAL, &liveTimer, NULL);
     }
+  return SUCCESS;
 }
 
 
