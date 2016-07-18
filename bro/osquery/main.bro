@@ -178,10 +178,10 @@ function send_subscribe_or_unsubscribe(peer_name: string, ev: Event, subscribe: 
 	if ( ev$utype == REMOVE )
 		update_type = "REMOVED";
 
-	local ev_args1 = subscribe ? BrokerComm::event_args(host_subscribe, ev_name, ev$query, update_type, init_dump)
-	                           : BrokerComm::event_args(host_unsubscribe, ev_name, ev$query, update_type, init_dump);
+	local ev_args1 = subscribe ? Broker::event_args(host_subscribe, ev_name, ev$query, update_type, init_dump)
+	                           : Broker::event_args(host_unsubscribe, ev_name, ev$query, update_type, init_dump);
 
-	BrokerComm::event(host_topic, ev_args1);
+	Broker::send_event(host_topic, ev_args1);
 	
 	}
 
@@ -259,7 +259,7 @@ function set_host_group(peer_name: string, group: string)
 		{
 		local topic = fmt("/bro/osquery/group/%s", group);
 		log_local("info", fmt("subscribing to topic %s", topic));
-		BrokerComm::subscribe_to_events(topic);
+		Broker::subscribe_to_events(topic);
 		add groups[group];
 		}
 
@@ -273,13 +273,13 @@ event bro_init()
 	# TODO: Not sure this should stay here. We still need to figure out a way
 	# for different applications to use Broker jointly without messing up
 	# whatever another one is doing.
-	BrokerComm::enable();
+	Broker::enable();
 
 	local topic = "/bro/osquery/group/default";
 	log_local("info", fmt("subscribing to topic %s", topic));
-	BrokerComm::subscribe_to_events(topic);
+	Broker::subscribe_to_events(topic);
 
-	BrokerComm::listen(9999/tcp, "0.0.0.0");
+	Broker::listen(9999/tcp, "0.0.0.0");
 	}
 
 event host_log(peer_name: string, msg: string)
@@ -307,7 +307,7 @@ event host_ready(peer_name: string)
 	add hosts[ip, peer_name];
 	}
 
-event BrokerComm::incoming_connection_established(peer_name: string)
+event Broker::incoming_connection_established(peer_name: string)
 	{
 	log_peer("info", peer_name, "incoming connection established");
 
@@ -338,11 +338,11 @@ event BrokerComm::incoming_connection_established(peer_name: string)
 	local group_topic = fmt("/bro/osquery/group/%s", group);
 
 	log_peer("info", peer_name, fmt("setting topic %s", group_topic));
-	local ev_args = BrokerComm::event_args(host_set_topic, group_topic);
-	BrokerComm::event(host_topic, ev_args);
+	local ev_args = Broker::event_args(host_set_topic, group_topic);
+	Broker::send_event(host_topic, ev_args);
 	}
 
-event BrokerComm::connection_incoming_connection_broken(peer_name: string)
+event Broker::connection_incoming_connection_broken(peer_name: string)
 	{
 	local ip = to_addr(peer_name);
 	delete hosts[ip, peer_name];
