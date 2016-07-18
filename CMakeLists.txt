@@ -1,4 +1,27 @@
 cmake_minimum_required(VERSION 2.8)
+string(ASCII 27 ESC)
+macro(WARNING_LOG MESSAGE)
+  message("-- ${ESC}[31m${MESSAGE}${ESC}[m")
+endmacro(WARNING_LOG)
+
+macro(LOG MESSAGE)
+  message("-- ${MESSAGE}")
+endmacro(LOG)
+
+# If no explicit compiler override and clang++ exists, prefer clang.
+find_file(CLANGXX_EXISTS "clang++")
+if(DEFINED ENV{CC})
+  set(CMAKE_C_COMPILER "$ENV{CC}")
+  LOG("Overriding C compiler from clang to $ENV{CC}")
+elseif(CLANGXX_EXISTS)
+  set(CMAKE_C_COMPILER "clang")
+endif()
+if(DEFINED ENV{CXX})
+  set(CMAKE_CXX_COMPILER "$ENV{CXX}")
+  LOG("Overriding CXX compiler from clang++ to $ENV{CXX}")
+elseif(CLANGXX_EXISTS)
+  set(CMAKE_CXX_COMPILER "clang++")
+endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 
@@ -6,21 +29,6 @@ project(bro-osquery)
 
 # Name of extension.
 set(TARGET bro-osquery)
-
-# If no explicit compiler override and clang++ exists, prefer clang.
-find_file(CLANGXX_EXISTS "clang++")
-if(DEFINED ENV{CC})
-	set(CMAKE_C_COMPILER "$ENV{CC}")
-	LOG("Overriding C compiler from clang to $ENV{CC}")
-elseif(CLANGXX_EXISTS)
-	set(CMAKE_C_COMPILER "clang")
-endif()
-if(DEFINED ENV{CXX})
-	set(CMAKE_CXX_COMPILER "$ENV{CXX}")
-	LOG("Overriding CXX compiler from clang++ to $ENV{CXX}")
-elseif(CLANGXX_EXISTS)
-	set(CMAKE_CXX_COMPILER "clang++")
-endif()
 
 find_package(Libcaf COMPONENTS core io REQUIRED)
 find_package(Broker REQUIRED)
