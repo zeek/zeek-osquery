@@ -10,7 +10,8 @@ traffic. The extension is controlled from Bro scripts, which sends
 SQL-style queries to the hosts and then begins listening for any
 updates coming back.
 
-Right now, we provide three pre-written Bro scripts that use this
+Right now, we provide pre-written Bro scripts for all platforms's
+common events only. Three of these Bro scripts that use this
 extension to add the following events to::
 
     # Triggered for new processes on host.
@@ -46,7 +47,7 @@ corresponding Bro log files. Here's an excerpt from
     This extension is in still early prototype state. We're actively
     working on it and appreciate any feedback.
 
-    We have so far tested it on CentOS7 and Fedora 22 Linux systems.
+    We have so far tested it on CentOS7, Ubuntu 14 and Fedora 22 Linux systems.
     We plan to port it to FreeBSD soon.
 
 
@@ -117,7 +118,7 @@ In more detail, these are the steps involved:
 
         # git clone --recursive git://git.bro.org/bro
         # cd bro
-        # ./configure --prefix=/opt/bro --with-libcaf=/opt/bro-osquery
+        # ./configure --enable-broker --prefix=/opt/bro --with-libcaf=/opt/bro-osquery
         # make && make install
 
     - Build and install the bro-osquery plugin::
@@ -152,6 +153,8 @@ In more detail, these are the steps involved:
       connections from the extension, and
       ``/opt/bro/logs/current/osq-*.log`` will record reported
       activity.
+
+      *Note: ``osqueryd`` must be running in backgroud.
 
       Normally, you will want to run ``bro-osquery`` through and init
       script or systemd. The build process generates a service file
