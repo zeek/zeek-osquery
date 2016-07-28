@@ -12,16 +12,9 @@
 #pragma once
 
 
-#include <broker/address.hh>
 #include <broker/broker.hh>
-#include <broker/endpoint.hh>
 #include <broker/message_queue.hh>
-#include <osquery/sdk.h>
 #include <poll.h>
-#include <iostream>
-#include <unistd.h>
-#include <vector>
-#include <ctime>
 #include "utility.h"
 #include "../aux/sql_parser/lexer.h"
 

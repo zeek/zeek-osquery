@@ -11,10 +11,7 @@
 
 #pragma once
 #include <sys/time.h>
-#include <csignal>
 #include "BrokerQueryManager.h"
-#include "utility.h"
-
 
 /**
  * This class is responsible for broker connection management and as an higher 

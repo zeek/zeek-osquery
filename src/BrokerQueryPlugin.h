@@ -12,7 +12,6 @@
 
 #pragma once
 
-#include <osquery/logger.h>
 #include <osquery/sdk.h>
 
 using namespace osquery;

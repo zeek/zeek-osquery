@@ -10,8 +10,6 @@
  */
 
 #include "BrokerQueryManager.h"
-#include "utility.h"
-#include "BrokerConnectionManager.h"
 
 
  //variable to track no of offline event

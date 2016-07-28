@@ -11,20 +11,7 @@
 
 #pragma once
 
-
-#include <string>
-#include <iostream>
-#include <sstream>
-#include <csignal>
-#include <sys/time.h>
-
-#include <osquery/sdk.h>
-
 #include "BrokerConnectionManager.h"
-#include "BrokerQueryManager.h"
-#include "BrokerQueryPlugin.h"
-#include "utility.h"
-
 
 /**
  * This class implements the simple state machine operation. Its main function
