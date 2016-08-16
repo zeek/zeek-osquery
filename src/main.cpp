@@ -9,6 +9,8 @@
  *
  */
 
+
+
 #include "StateMachine.h"
 
 
@@ -40,7 +42,7 @@ int main(int argc, char* argv[]) {
       signalHandler->setupSignalHandler();
       //StateMachine object
       StateMachine stateMachineObj(signalHandler);
-      
+
       //run the state machine
       int statusCode = stateMachineObj.Run();
 

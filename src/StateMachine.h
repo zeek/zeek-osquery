@@ -14,9 +14,9 @@
 #include "BrokerConnectionManager.h"
 
 /**
- * This class implements the simple state machine operation. Its main function
- * is to track local as well as remote (bro-side) events and then do the 
- * allowed operations if the event is received in allowed operation state. 
+ * @brief This class implements the simple state machine operation. Its main 
+ * function is to track local as well as remote (bro-side) events and then do 
+ * the allowed operations if the event is received in allowed operation state. 
  * If event is illegal then error/warning message will be delivered to bro-side.
  * 
  * This class has been written in an effort to eliminate or minimize the 
@@ -86,7 +86,12 @@ typedef std::deque<std::vector<broker::data>,
         std::allocator<std::vector<broker::data> > > PollData;
 
 
-
+/**
+ * @brief This class implements the simple state machine operation. Its main function
+ * is to track local as well as remote (bro-side) events and then do the 
+ * allowed operations if the event is received in allowed operation state. 
+ * If event is illegal then error/warning message will be delivered to bro-side.
+ */
 class StateMachine
 {
 private:

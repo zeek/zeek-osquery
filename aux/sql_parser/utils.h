@@ -11,11 +11,13 @@
 
 #include <cstring>
 
-/* This file contains function that do string manipulation, string matching, 
- * character matching 
+/** @brief This file contains function that do string manipulation, string 
+ * matching and character matching 
  */
 
-// extract slice of string given the buffer, offset position and length
+ /**
+ * @brief extract slice of string given the buffer, offset position and length
+ */
 void extract(sqlstate *state, char *copy){
   int i;
   int offset = state->identifier.offset;
@@ -26,56 +28,91 @@ void extract(sqlstate *state, char *copy){
   }
   *(copy+i) = '\0';
 }
-//returns ture if character is digit
+
+/**
+ * @brief returns ture if character is digit
+ * @param c input character
+ */
 bool is_digit(char c){
   return isdigit(c);
 }
 
-//returns true if character is some character of digit or underscore
+/**
+ * @brief returns true if character is some character of digit or underscore
+ * @param c input character
+ */
 bool is_identifier(char c){
   return isalpha(c) || isdigit(c) || c == '_';
 }
 
-//returns true if character is digit
+/**
+ * @brief returns true if character is digit
+ * @param c input character
+ */
 bool is_alpha(char c){
   return isalpha(c);
 }
 
-//returns true if character is space
+/**
+ * @brief returns true if character is space
+ * @param c input character
+ */
 bool is_space(char c){
   return c == ' ' || c == '\t' || c == '\v' || c == '\f';
 }
 
-//returns true if character is '*' representing all in SQL
+/**
+ * @brief returns true if character is '*' representing all in SQL
+ * @param c input character
+ */
 bool is_all(char c){
   return c == '*';
 }
 
-//returns true if character is period/dot
+/**
+ * @brief returns true if character is period/dot
+ * @param c input character
+ */
 bool is_dot(char c){
   return c == '.';
 }
 
-//returns true if character is semi-colon -> terminator in SQL statement
+/**
+ * @brief returns true if character is semi-colon -> terminator in SQL statement
+ * @param c input character
+ */
 bool is_terminator(char c){
   return c == ';';
 }
 
-//returns true if character is one of the punctuation marks ( ) ,
+/**
+ * @brief returns true if character is one of the punctuation marks ( ) ,
+ * @param c input character
+ */
 bool is_puntuation(char c){
   return c == ',' || c == '(' || c == ')';
 }
 
-//returns true if the character is equal operator
+/**
+ * @brief returns true if the character is equal operator
+ * @param c input character
+ */
 bool is_equal(char c){
   return c == '=';
 }
 
-//returns true if character is quotation mark. 
+/**
+ * @brief returns true if character is quotation mark. 
+ * @param c input character
+ */
 bool is_quote(char c){
   return c == '\'';
 }
 
+/**
+ * @brief returns true if character is any of arithmatic operation. 
+ * @param c input character
+ */
 bool is_arithmatic(char c)
 {
     return c == '=' || c == '>' || c == '<' || c == '!';

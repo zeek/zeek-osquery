@@ -26,7 +26,6 @@
 #include "sqlite3.h"
 
 
-
 using namespace osquery;
 using std::runtime_error;
 
@@ -38,7 +37,7 @@ using std::runtime_error;
 enum OperationOutput {KILL_SIGNAL = -1, FAILURE = 0 , SUCCESS = 1};
 //callback event data
 extern std::string cBData;
-/*
+/**
  * @brief Exception Class
  */
 class SignalException : public runtime_error
@@ -55,8 +54,8 @@ class SignalException : public runtime_error
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
-/*
- * @brief Kill or ctrl+C signal Handler Class
+/**
+ * @brief SIGKill or CTRL+C signal Handler Class
  */
 class SignalHandler
 {
@@ -101,6 +100,9 @@ public:
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
+/**
+ * @brief Handles all reading operations for the config file (broker.ini)
+ */
 class FileReaderWriter
 {
 private: 
@@ -195,6 +197,7 @@ public:
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
+
 /**
  * @brief This class encloses the functionality of offline logging and then 
  * sending formated data to Bro master.
@@ -295,3 +298,5 @@ public:
     
     //pointer to database class
     extern offlineSqliteDB* ptDb;
+    
+

@@ -13,9 +13,10 @@
 #include <sys/time.h>
 #include "BrokerQueryManager.h"
 
+
 /**
- * This class is responsible for broker connection management and as an higher 
- * level implementation for broker query manager operations. 
+ * @brief This class is responsible for broker connection management and as an 
+ * higher level implementation for broker query manager operations. 
  */
 
 class BrokerConnectionManager

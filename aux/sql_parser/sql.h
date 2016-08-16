@@ -17,7 +17,7 @@
 using namespace std;
 
 /**
- * Structure that saves a chunk of SQL statement for further processing
+ * @brief Structure that saves a chunk of SQL statement for further processing
  * offset: offset form the start of string
  * length: length of chunk/word
  */
@@ -28,24 +28,25 @@ struct sqlidentifier{
 };
 
 /**
- * SQL statement current position.
+ * @brief SQL statement current position.
  */
 struct sqlstate{
   char *buffer;
   int offset;
   sqlidentifier identifier;
-  sqlstate(char *c, int o, sqlidentifier i):buffer(c), offset(o), identifier(i){};
+  sqlstate(char *c, int o, sqlidentifier i):buffer(c), offset(o), 
+  	identifier(i){};
 };
 
 /**
- * Structure to hold the SQL statement.
+ * @brief Structure for SQL statement.
  */
 struct sqlstring {
   std::string s;
 };
 
 /**
- * SQL statement column information structure
+ * @brief SQL statement's column information structure
  * tbname: table name 
  * name: name of column
  * sql_type: corresponding type of column
@@ -60,7 +61,7 @@ struct sqlcolumn{
 };
 
 /**
- * SQL statement where clause structure
+ * @brief SQL statement's where clause structure
  * tbname: table name
  * column: column name used in the where clause
  * value: condition that is used in the where clause
@@ -74,7 +75,7 @@ struct sqlwhere{
 };
 
 /**
- * Structure to hold INNER JOIN table information
+ * @brief Structure to hold INNER JOIN table information
  * col1 => Column structure for 1st table and its corresponding column
  * col2 => Column structure for 2nd table and its corresponding column
  */
@@ -85,7 +86,7 @@ struct sqljoin{
     {};
 };
 /**
- * Structure to hold the whole table in one place
+ * @brief Structure to hold the whole table in one place
  * name: name of table
  * columns: vector of columns
  * primary_key: primary key of table.

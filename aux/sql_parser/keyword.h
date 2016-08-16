@@ -37,7 +37,7 @@ typedef enum{
 } sql_token;
 
 /*
- *Enum containing all possible data types for SQL
+ *@brief Enum containing all possible data types for SQL
  */
 typedef enum{
   /* 1 */ TYPE_INT,
@@ -51,7 +51,7 @@ typedef enum{
 } sql_type;
 
 /**
- * It will map data type of a character with the enum
+ * @brief It will map data type of a character with the enum
  * @param s word for the data type
  * @param l length of word
  * @return returns the corresponding enum type
@@ -87,7 +87,7 @@ inline sql_type sql_checktype(char *s, int l){
 }
 
 /**
- * Maps the given word with the SQL key words
+ * @brief Maps the given word with the SQL key words
  * @param str word that is to be compared/checked
  * @param length length of that word
  * @return returns the corresponding enum type 

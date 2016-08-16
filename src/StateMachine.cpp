@@ -178,12 +178,11 @@ int StateMachine::processEventsInWaitForTopicState(int ev,
             std::ostringstream stringStream;
             stringStream << eventToString(ev) << " is not allowed in " <<
                     "WAIT_FOR_TOPIC" << "expecting group topic events";
-            LOG(WARNING) << stringStream.str();
+            LOG(WARNING) << stringStream;
             ptBCM->getQueryManagerPointer()->
                 sendErrortoBro(stringStream.str());
         }
     };
-  return SUCCESS;
 }
 
 int StateMachine::doActionsForGroupTopicEvent(broker::message msg)
@@ -248,12 +247,12 @@ int StateMachine::processEventsInGetAndProcessQueriesState(int ev,
             std::ostringstream stringStream;
             stringStream << eventToString(ev) << " is not allowed in " <<
                   "GET_AND_PROCESS_QUERIES " << "expecting subscription events";
-            LOG(WARNING) << stringStream.str();
+            LOG(WARNING) << stringStream;
             ptBCM->getQueryManagerPointer()->
                 sendErrortoBro(stringStream.str());
         }
     };
-    return SUCCESS;
+    
 }
 
 int StateMachine::doActionsForHostSubscribeEvent(broker::message msg)
@@ -494,7 +493,6 @@ int StateMachine::doActionsForTimerEvent()
     {
         setitimer (ITIMER_VIRTUAL, &liveTimer, NULL);
     }
-  return SUCCESS;
 }
 
 

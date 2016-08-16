@@ -380,14 +380,14 @@ sql_token SqlLexer::lexer_inner_join(sqlstate *sql_state, sqlselect *sql)
         c = PEEK;
         extract(sql_state, t1name);
         string table1_name(t1name);
-        //std::cout <<"Table1: " << table1_name <<endl;
+
         if(is_dot(PEEK))
         {SKIP;}
         t = lexer_alpha(sql_state, sql);
         c = PEEK;
         extract(sql_state, c1name);
         string column1_name(c1name);
-        //std::cout <<"col1: " << column1_name <<endl;
+
         sqlcolumn col1(table1_name,column1_name);
         // where username = ''
         while (PEEK != '=')
@@ -399,7 +399,7 @@ sql_token SqlLexer::lexer_inner_join(sqlstate *sql_state, sqlselect *sql)
         c = PEEK;
         extract(sql_state, t2name);
         string table2_name(t2name);
-        //std::cout <<"Table2: " << table2_name <<endl;
+
         if(is_dot(PEEK))
         {SKIP;}
         t = lexer_alpha(sql_state, sql);

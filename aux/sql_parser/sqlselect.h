@@ -16,8 +16,8 @@
 using namespace std;
 
 /**
- * This class is used to represent all elements of SQL statement starting with
- * select keyword
+ * @brief This class is used to represent all elements of SQL statement starting
+ * with SELECT keyword
  */
 class sqlselect{
   //whether the SQL statement contains * => all character 
@@ -38,35 +38,90 @@ class sqlselect{
   std::string order_by;
 
 public:
-  //constructor
+  /**
+   * @brief constructor of the class
+   */
   sqlselect();
-  //function to add new column 
+  
+  /**
+   * @brief function to add new column
+   * @param target input structure with column information
+   */
   void addColumn( sqlcolumn target);
-  //function to add where clause information
+  
+  /**
+   * @brief function to add where clause information
+   * @param column input structure with column information
+   * @param value input value to be compared in the where clause
+   * @param arth arithmatic condition in the where clause
+   */
   void addWhere(sqlcolumn column, std::string value, std::vector<char> arth);
-  //function to add inner join information
+  
+  /**
+   * @brief function to add inner join information
+   * @param col1 first input structure with column information
+   * @param col2 second input structure with column information
+   */
   void addJoin(sqlcolumn col1, sqlcolumn col2);
-  //function to set the table name
+  
+  /**
+   * @brief function to set the table name
+   * @param t input table name in the SQL statement
+   */
   void setTable(std::string t);
-  //function to set the column name used by order_by keyword
+  
+  /**
+   * @brief function to set the column name used by order_by keyword
+   */
   void set_order_by(std::string o);
-  //return the table name
+  
+  /**
+   * @brief get the table name
+   * @return returns the table name provided in the sql statement
+   */
   std::string getTable();
-  //get columns of SQL statement
+  
+  /**
+   * @brief get vector of columns provided in the SQL statement
+   * @return vector of columns
+   */
   std::vector<sqlcolumn> getColumns();
-  //get where clause information
+  
+  /**
+   * @brief get where clause information
+   * @return vector of where clause info
+   */
   std::vector<sqlwhere> getWheres();
-  //get the join clause information
+  
+  /**
+   * @brief get the join clause information
+   * @return vector of join statements info
+   */
   std::vector<sqljoin> getJoins();
-  //prints all columns in the table
+  
+  /**
+   * @brief prints all columns in the table
+   */
   void printColumns();
-  //print table name
+  
+  /**
+   * @brief print table name
+   */
   void printTable();
-  //print where information
+  
+  /**
+   * @brief print where information
+   */
   void printWheres();
-  //prints order_by information
+  
+  /**
+   * @brief prints order_by information
+   */
   void printOrderBy();
-  //print inner join condition
+  
+  /**
+   * @brief print inner join condition
+   */
   void printJoin();
 
 };

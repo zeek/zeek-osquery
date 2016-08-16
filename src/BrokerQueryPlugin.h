@@ -16,6 +16,10 @@
 
 using namespace osquery;
 
+ /**
+  * @brief Configuration class for subscribing sql queries at run time. This 
+  * class will implemented soon. 
+  */
 class BrokerQueryManagerPlugin : public ConfigPlugin {
 public:
     //Default Constructor

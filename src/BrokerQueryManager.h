@@ -56,7 +56,6 @@ struct query_update
 
 /**
  *  @brief Stores columns names extracted from query string
- *  
  */
 
 //vector of query columns
@@ -71,7 +70,7 @@ const int SIZE=1024;
 const int PTIME = 2000;
 
 /**
- *  @brief Query Manager is responsible for update tracking for given queries
+ *  @brief  Query Manager is responsible for update tracking for given queries
  * 
  *  When broker connection is establish then control is handled to 
  *  BrokerQueryManager. Then it keeps tracking updates and sends update events
@@ -163,7 +162,6 @@ public:
      *  @brief A wrapper function to get daemon state against input SQL query. 
      * 
      *  @param queryString SQL formated string to get host-level information
-     *
      *  @return Query results in the form of osquery::QueryData.
      */ 
     QueryData getQueryResult(const std::string& queryString);
@@ -206,7 +204,6 @@ public:
     * from broker message.
     * 
     * @param msg broker::message received in event form
-    *
     * @return input_query structure containing event and SQL query
     *
     */

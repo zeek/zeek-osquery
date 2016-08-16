@@ -12,6 +12,7 @@
 #include "BrokerQueryManager.h"
 
 
+
  //variable to track no of offline event
  int offlineCount=0;
  //variable to track no of offline events sent to master
