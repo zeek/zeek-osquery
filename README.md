@@ -1,4 +1,4 @@
- Info #
+# Branch Info #
 This is a development branch of `bro-osquery`that aims for creating additional report capabilities of the `osquery` host sensor. Using the network security monitor `Bro` and its communication library `broker`, we make `osquery` to receive SQL subscription from `Bro` and to return events occuring on the monitored host matching the SQL query.
 
 ## Architecture ##
@@ -18,13 +18,14 @@ Therefore, this branch is development bro-osquery with characteristics as follow
    
 3. **Using LoggerPluging**
     * Osquery calls the logger-plugin to log the results of a query, (including/exclusively?) the [results of scheduled queries](https://github.com/facebook/osquery/blob/master/osquery/dispatcher/scheduler.cpp#L79). The logger-plugin sends each result row as an event back to the respective bro.
-    * An result row can be mapped to a specific SQL schedule query, and the respective Bro that subscribed to this query.
+    * A result row can be mapped to a specific SQL schedule query, and the respective Bro that subscribed to this query.
+    * To be able to parse the serialized log string, the run flag `--log_result_events=0` must be set.
  
 4. **Using one Broker Endpoint**
      * Extension (receiving new queries from Bros) and logger-plugin (sending out query results) run in the same process, so we can easily share the same broker endpoint for these reasons.
      
 5. **Handling Osquery Events**
-    * The logger-plugin currently receive also results from the event-tables according to the regular schedule.
+    * The logger-plugin currently receives also results from the event-tables according to the regular schedule.
     * TODO: 
         * The logger-plugin can also request to be directly invoked when an [event](https://github.com/facebook/osquery/blob/master/osquery/logger/logger.cpp#L421) occurs.
         * This seems to be independent from the scheduled queries. Hence, we would have to manually match such reported events against the queries we received from bro
@@ -33,7 +34,7 @@ Therefore, this branch is development bro-osquery with characteristics as follow
 ## Installation ##
  As this branch is under heavy development, we currently also work on a build system to integrate `bro-osquery` into `osquery`. There is no working solution for all platforms yet. However, here are some implications when compiling `bro-osquery`:
  
- 1. Osquery comes with its own dependencies, system libraries and compilers (delivered with brew). As a result, also the library `libosquery` is build with this costum tool-chain.
+ 1. Osquery comes with its own dependencies, system libraries and compilers (delivered with brew). As a result, also the library `libosquery` is build with this custom tool-chain.
  2. When building bro-osquery and including/linking against `libosquery`, we need the very same tool-chain. That is why we will integrate bro-osquery into the build system of osquery.
  3. Also the libraries `libbroker` and `libcaf` need to be built following the same tool-chain to avoid conflicts. In particular, this includes:
      * -std=c++11
