@@ -21,13 +21,10 @@ FLAG(string,
      "127.0.0.1",
      "IP Address for ERROR/WARN/INFO and results logging (Bro Endpoint)");
 
-broker::endpoint* BroLoggerPlugin::loggerEP = nullptr;
-
 Status BroLoggerPlugin::setUp() {
 
   // TODO
   // Ensure FLAGS_bro_endpoint is a valid IP/hostname
-
   return Status(0, "OK");
 }
 
@@ -42,8 +39,7 @@ Status BroLoggerPlugin::logString(const std::string& s) {
     LOG(ERROR) << "Parsing query result FAILED";
     return Status(1, "Failed to deserialize QueryLogItem");
   }
-  BrokerManager bm = BrokerManager::getInstance();
-  return bm.logQueryLogItemToBro(item, "/osquery/schedule/result", BroLoggerPlugin::loggerEP);
+  return BrokerManager::getInstance()->logQueryLogItemToBro(item);
 }
 
 Status BroLoggerPlugin::logSnapshot(const std::string& s) {

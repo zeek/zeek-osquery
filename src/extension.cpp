@@ -1,13 +1,3 @@
-/*
- *  Copyright (c) 2014-present, Facebook, Inc.
- *  All rights reserved.
- *
- *  This source code is licensed under the BSD-style license found in the
- *  LICENSE file in the root directory of this source tree. An additional grant
- *  of patent rights can be found in the PATENTS file in the same directory.
- *
- */
-
 #include <osquery/sdk.h>
 #include <osquery/system.h>
 
@@ -40,34 +30,50 @@ int main(int argc, char* argv[]) {
 
   // Setup Broker Endpoint
   broker::init();
-  BrokerManager bm = BrokerManager::getInstance();
-  broker::endpoint extensionEP("Bro-osquery Extension");
-  broker::message_queue mq_schedule("/osquery/schedule/query", extensionEP);
-  auto status_broker = bm.peerEndpoint(extensionEP);
+  BrokerManager* bm = BrokerManager::getInstance();
+  std::string uid = bm->getNodeID();
+  bm->createEndpoint("Bro-osquery Extension");
+  broker::message_queue* mq_all = bm->createAndGetMessageQueue("/osquery/all");
+  broker::message_queue* mq_uid = bm->createAndGetMessageQueue(std::string("/osquery/uid/") + uid);
+  auto status_broker = bm->peerEndpoint("172.17.0.2", 9999);
   if (!status_broker.ok()) {
     LOG(ERROR) << status_broker.getMessage();
     runner.requestShutdown(status_broker.getCode());
   }
-  BroLoggerPlugin::loggerEP = &extensionEP;
+  // Annouce this endpoint to be a bro-osquery extension
+  broker::message announceMsg;
+  announceMsg.push_back("new_osquery_host");
+  announceMsg.push_back(uid);
+  bm->getEndpoint()->send("/osquery/announces", announceMsg);
 
   // Wait for schedule requests
+  // TODO wait on "/osquery/all" in parallel
   while (true) {
-    for ( auto& msg: mq_schedule.need_pop() ) {
-      // Retrieve query
-      std::string query = broker::to_string(msg);
-      std::size_t pos = query.find("]") -  1;
-      query = query.substr(1,pos);
-
-      // Is add
-      // Assuming query subscription only
-      bm.addBrokerQueryEntry(query);
-
-      // is remove
-      // TODO: removeBrokerQueryEntry(msg)
+    for ( auto& msg: mq_uid->need_pop() ) {
+      // Check Event Type
+      std::string eventName = broker::to_string(msg[0]);
+      LOG(INFO) << "Received Event With Name: " << eventName;
       
+      if ( eventName == "add_osquery_query" ) 
+      {
+        // Retrieve query
+        std::string response_eventName = broker::to_string(msg[1]);
+        std::string query = broker::to_string(msg[2]);
+        printColumnsInfo(query);
+        bm->addBrokerQueryEntry(query, response_eventName);
+      }
+      else if ( eventName == "remove_osquery_query" ) 
+      {
+        LOG(ERROR) << "NOT IMPLEMENTED";
+      } else 
+      {
+        LOG(ERROR) << "Unknown Event Name: '" << eventName << "'";
+	continue;
+      }
+
       // Apply to new config/schedule
       std::map<std::string, std::string> config;
-      config["data"] = bm.getQueryConfigString();
+      config["data"] = bm->getQueryConfigString();
       LOG(INFO) << "Applying new config: " << config["data"];
       Config::getInstance().update(config);
     }

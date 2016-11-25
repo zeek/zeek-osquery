@@ -15,8 +15,6 @@ namespace osquery {
 class BroLoggerPlugin : public LoggerPlugin {
  public:
 
-  static broker::endpoint* loggerEP;
-
   Status setUp() override;
 
   /// Log results (differential) to a distinct path.
