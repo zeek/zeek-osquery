@@ -33,8 +33,7 @@ Status BroLoggerPlugin::logString(const std::string& s) {
   QueryLogItem item;
   Status status = deserializeQueryLogItemJSON(s, item);
   if ( status.getCode() == 0 ) {
-    printQueryLogItemJSON(s);
-    //return  logQueryLogItemToBro(item);
+    //printQueryLogItemJSON(s);
   } else {
     LOG(ERROR) << "Parsing query result FAILED";
     return Status(1, "Failed to deserialize QueryLogItem");
@@ -43,8 +42,7 @@ Status BroLoggerPlugin::logString(const std::string& s) {
 }
 
 Status BroLoggerPlugin::logSnapshot(const std::string& s) {
-  // Send the snapshot data to a separate filename.
-  //return logPrintToBro(s,"/schedule/snapshot");
+  // NOT IMPLEMENTED
   return Status(1, "Not Implemented");
 }
 

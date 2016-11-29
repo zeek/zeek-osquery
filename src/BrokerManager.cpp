@@ -37,6 +37,11 @@ std::string BrokerManager::getNodeID() {
   return this->nodeID;
 }
 
+std::vector<std::string> BrokerManager::getGroups() {
+  //TODO: read dynamic list
+  return std::vector<std::string>{"eu/de/HH/UHH"};
+}
+
 /////////////////////////////////////////////////////////
 //////////// Endpoint ///////////////////////////////////
 /////////////////////////////////////////////////////////
@@ -55,15 +60,28 @@ broker::endpoint* BrokerManager::getEndpoint() {
   return this->ep;
 }
 
-broker::message_queue* BrokerManager::createAndGetMessageQueue(std::string topic) {
+Status BrokerManager::createMessageQueue(std::string topic) {
   auto it = this->messageQueues.find(topic);
   if ( it == this->messageQueues.end() )
   {
     LOG(INFO) << "Creating message queue: " << topic;
     broker::message_queue* mq = new broker::message_queue(topic, *(this->ep));
     this->messageQueues[topic] = mq;
+    return Status(0,"OK");
   }
+  return Status(1,"Message queue exists for topic");
+}
+
+broker::message_queue* BrokerManager::getMessageQueue(std::string topic) {
   return this->messageQueues.at(topic);
+}
+
+Status BrokerManager::getTopics(std::vector<std::string>& topics) {
+  topics.clear();
+  for (auto it = this->messageQueues.begin(); it != this->messageQueues.end(); it++) {
+    topics.push_back(it->first);
+  }
+  return Status(0, "OK");
 }
 
 Status BrokerManager::peerEndpoint(std::string ip, int port) {
@@ -89,23 +107,57 @@ Status BrokerManager::peerEndpoint(std::string ip, int port) {
 //////////////// Schedule/Query Handling ////////////////
 /////////////////////////////////////////////////////////
 
-Status BrokerManager::addBrokerQueryEntry(const std::string query, const std::string eventName, 
-                           int interval, bool added, bool removed, bool snapshot) {
+Status BrokerManager::addBrokerQueryEntry(const QueryRequest& qr) {
   const std::string queryID = std::to_string(this->_nextUID++);
-  return addBrokerQueryEntry(queryID, query, eventName, interval, added, removed, snapshot);
+  return addBrokerQueryEntry(queryID, qr);
 }
 
-Status BrokerManager::addBrokerQueryEntry(const std::string& queryID, const std::string query, const std::string eventName,
-                           int interval, bool added, bool removed, bool snapshot) {
+Status BrokerManager::addBrokerQueryEntry(const std::string& queryID, const QueryRequest& qr) {
+  std::string query = qr.query;
+  std::string response_event = qr.response_event;
+  std::string response_topic = qr.response_topic;
+  int interval = qr.interval;
+  bool added = qr.added;
+  bool removed = qr.removed;
+  bool snapshot = qr.snapshot;
   if ( this->brokerQueries.find(queryID) != this->brokerQueries.end() ) 
   {
     LOG(ERROR) << "QueryID '" << queryID << "' already exists";
     return Status(1, "Duplicate queryID");
   }
 
-  this->eventNames[queryID] = eventName;
   this->brokerQueries[queryID] = BrokerQueryEntry{queryID, query, interval, added, removed, snapshot};
+  this->eventNames[queryID] = response_event;
+  this->eventTopics[queryID] = response_topic;
   return Status(0, "OK");
+}
+
+std::string BrokerManager::findIDForQuery(const std::string& query) {
+  // Search the queryID for this specific query
+  for (const auto& e: this->brokerQueries) {
+    std::string queryID = e.first;
+    BrokerQueryEntry bqe = e.second;
+    if ( std::get<1>(bqe) == query ) {
+      return queryID;
+    }
+  }
+  return "";
+}
+
+Status BrokerManager::removeBrokerQueryEntry(const std::string& query) {
+  std::string queryID = this->findIDForQuery(query);
+  if (queryID == "") {
+    LOG(ERROR) << "Unable to find ID for query: '" << query << "'";
+    return Status(1, "Unable to find ID for query");
+  }
+
+  // Delete query info
+  LOG(INFO) << "Deleting query '" << query << "' with queryID '" << queryID << "'";
+  this->eventTopics.erase(queryID);
+  this->eventNames.erase(queryID);
+  this->brokerQueries.erase(queryID);
+
+  return Status(0,"OK");
 }
 
 std::string BrokerManager::getQueryConfigString() {
@@ -114,13 +166,11 @@ std::string BrokerManager::getQueryConfigString() {
 
   // Format each query
   std::vector<std::string> scheduleQ;
-//  for (const auto& i: brokerQueries) {
   for(auto it = this->brokerQueries.begin(); it != this->brokerQueries.end(); it++) {
     auto i = it->second;
     std::stringstream ss;
     ss << "\"" << std::get<0>(i) <<"\": {\"query\": \"" << std::get<1>(i) << ";\", \"interval\": " << std::get<2>(i) << ", \"added\": " << std::get<3>(i) << ", \"removed\": " << std::get<4>(i) << ", \"snapshot\": " << std::get<5>(i) << "}";
     std::string q = ss.str();
-//    LOG(INFO) << "BrokerQueryEntry: " << q;
     scheduleQ.push_back(q);
   }
   
@@ -133,7 +183,6 @@ std::string BrokerManager::getQueryConfigString() {
   }
   std::string queries = ss.str();
   std::string config = std::string( "{\"schedule\": {" ) + queries + std::string( "} }" );
-//  LOG(INFO) << "Assembled config:\n\t" << config;
   
   return config;
 }
@@ -145,7 +194,6 @@ std::string BrokerManager::getQueryConfigString() {
 
 Status BrokerManager::logQueryLogItemToBro(const QueryLogItem& qli) {
 
-  std::string topic = "/osquery/uid/"+this->getNodeID();
 
   // Attributes from QueryLogItem
   std::string queryID = qli.name; // The QueryID
@@ -156,7 +204,7 @@ Status BrokerManager::logQueryLogItemToBro(const QueryLogItem& qli) {
 
   // Send added
   for (const auto& row: qli.results.added) {
-    this->logQueryLogItemRowToBro(queryID, row, "added", topic);
+    this->logQueryLogItemRowToBro(queryID, row, "added");
   }  
 
   // Send removed
@@ -168,7 +216,7 @@ Status BrokerManager::logQueryLogItemToBro(const QueryLogItem& qli) {
   return Status(0, "OK");
 }
   
-Status BrokerManager::logQueryLogItemRowToBro(const std::string queryID, const osquery::Row& row, const std::string& trigger, const std::string& topic) {
+Status BrokerManager::logQueryLogItemRowToBro(const std::string queryID, const osquery::Row& row, const std::string& trigger) {
   // Create Event Message
   broker::message msg;
   // Set Event_Name
@@ -230,6 +278,7 @@ Status BrokerManager::logQueryLogItemRowToBro(const std::string queryID, const o
   }
 
   // Create and Send Broker Event Message
+  std::string topic = this->eventTopics.at(queryID);
   if ( this->ep == nullptr )
   {
     LOG(ERROR) << "Endpoint not set yet!";

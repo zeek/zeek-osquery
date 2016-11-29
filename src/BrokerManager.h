@@ -10,11 +10,22 @@
 
 namespace osquery {
 
-class BrokerManager {
-  
   //ID, query, interval, added, removed, snapshot
   typedef std::tuple<std::string, std::string, int, bool, bool, bool> BrokerQueryEntry;
 
+  struct QueryRequest {
+    std::string query; // The requested SQL query
+    std::string response_event; // The event name for the response event
+    std::string response_topic; // The topic name for the response event
+    int interval = 30;
+    bool added = true;
+    bool removed = false;
+    bool snapshot = false;
+  };
+
+
+class BrokerManager {
+  
   private:
     BrokerManager();
 
@@ -30,29 +41,37 @@ class BrokerManager {
     void printThis(std::string s);
     
     std::string getNodeID();
+    
+    std::vector<std::string> getGroups();
 
 
     osquery::Status createEndpoint(std::string ep_name);
 
     broker::endpoint* getEndpoint();
 
-    broker::message_queue* createAndGetMessageQueue(std::string topic);
+    osquery::Status createMessageQueue(std::string topic);
+
+    broker::message_queue* getMessageQueue(std::string topic);
+ 
+    osquery::Status getTopics(std::vector<std::string>& topics);
 
     osquery::Status peerEndpoint(std::string ip, int port);
 
 
-    osquery::Status addBrokerQueryEntry(const std::string query, const std::string eventName,
-                               int interval=10, bool added=true, bool removed=true, bool snapshot=false);
+    osquery::Status addBrokerQueryEntry(const QueryRequest& qr);
 
-    osquery::Status addBrokerQueryEntry(const std::string& queryID, const std::string query, const std::string eventName,
-                               int interval, bool added, bool removed, bool snapshot);
+    osquery::Status addBrokerQueryEntry(const std::string& queryID, const QueryRequest& qr);
+
+    std::string findIDForQuery(const std::string& query);
+
+    osquery::Status removeBrokerQueryEntry(const std::string& query);
 
     std::string getQueryConfigString();
 
 
     Status logQueryLogItemToBro(const QueryLogItem& qli);
 
-    Status logQueryLogItemRowToBro(const std::string queryID, const osquery::Row& row, const std::string& trigger, const std::string& topic);
+    Status logQueryLogItemRowToBro(const std::string queryID, const osquery::Row& row, const std::string& trigger);
 
   private:
     // The singleton object
