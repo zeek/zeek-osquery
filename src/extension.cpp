@@ -19,9 +19,19 @@ using namespace osquery;
 
 REGISTER_EXTERNAL(BroLoggerPlugin, "logger", "bro");
 
+void signalHandler( int signum ) {
+  LOG(INFO) << "Interrupt signal (" << signum << ") received";
+
+  // TODO Announce this node goes offline  
+
+  exit(signum);
+}
+
 int main(int argc, char* argv[]) {
+
+  signal(SIGINT, signalHandler);
   
-  // Setup Extension
+  // Setup OSquery Extension
   Initializer runner(argc, argv, ToolType::EXTENSION);
   auto status_ext = startExtension("bro-osquery", "0.0.1");
   if (!status_ext.ok()) {
@@ -36,8 +46,8 @@ int main(int argc, char* argv[]) {
   // Listen on default topics (global, groups and node)
   bm->createMessageQueue("/osquery/all");
   auto groups = bm->getGroups();
-  for (auto it=groups.begin(); it!=groups.end(); ++it) {
-    bm->createMessageQueue("/osquery/group/" + *it);
+  for (std::string g: groups) {
+    bm->createMessageQueue("/osquery/group/" + g);
   }
   std::string uid = bm->getNodeID();
   bm->createMessageQueue("/osquery/uid/" + uid);
@@ -57,32 +67,30 @@ int main(int argc, char* argv[]) {
   std::vector<std::string> topics;
   int sock;
   broker::message_queue* queue = nullptr;
-  int max;
+  int sMax;
   while (true) {
     // Retrieve info about each message queue
     FD_ZERO(&fds);
     bm->getTopics(topics); // List of subscribed topics
-    max = 0;
-    for (auto it=topics.begin(); it!=topics.end(); ++it) {
-      sock = bm->getMessageQueue(*it)->fd();
-      if (sock > max)
-        max = sock;
+    sMax = 0;
+    for (auto topic: topics) {
+      sock = bm->getMessageQueue(topic)->fd();
+      if (sock > sMax) {sMax = sock;}
       FD_SET(sock, &fds); // each topic -> message_queue -> fd
     }
     // Wait for incoming message
-    if ( select(max + 1, &fds, NULL, NULL, NULL) < 0) {
+    if ( select(sMax + 1, &fds, NULL, NULL, NULL) < 0) {
       LOG(ERROR) << "Select returned an error code";
       continue;
     }
     
     // Check for the socket where a message arrived on
-    for (auto it=topics.begin(); it!=topics.end(); ++it) {
-      std::string topic = *it;
+    for (auto topic: topics) {
       queue = bm->getMessageQueue(topic);
       sock = queue->fd();
-      if FD_ISSET(sock, &fds) {
+      if ( FD_ISSET(sock, &fds) ) {
     
-        // Process each message
+        // Process each message on this socket
         for ( auto& msg: queue->want_pop() ) {
           // Check Event Type
           std::string eventName = broker::to_string(msg[0]);
@@ -93,13 +101,16 @@ int main(int argc, char* argv[]) {
             QueryRequest qr;
             qr.query = broker::to_string(msg[2]);
             qr.response_event = broker::to_string(msg[1]);
-            qr.response_topic = topic; // or use custom as specified in msg
+            // The topic where the request was received
+            qr.response_topic = topic; // TODO: or use custom as optionally specified in msg
             bm->addBrokerQueryEntry(qr);
+
           } else if ( eventName == "remove_osquery_query" ) {
           // SQL Query Cancel
-            //TODO: find an UNIQUE identifier
+            //TODO: find an UNIQUE identifier (currently the exact sql string)
             std::string query = broker::to_string(msg[1]);
             bm->removeBrokerQueryEntry(query);
+
           } else {
           // Unkown Message
             LOG(ERROR) << "Unknown Event Name: '" << eventName << "'";
@@ -117,6 +128,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  LOG(ERROR) << "What happened here?";
   // Finally wait for a signal / interrupt to shutdown.
   runner.waitForShutdown();
   return 0;

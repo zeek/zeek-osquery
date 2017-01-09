@@ -25,6 +25,9 @@ void BrokerManager::printThis(std::string s) {
 }
 
 std::string BrokerManager::getNodeID() {
+  //TODO: read from config or default
+
+  // Generate Random ID
   if ( this->nodeID == "" ) {
     const char alphanum[] =
       "0123456789"
@@ -61,8 +64,7 @@ broker::endpoint* BrokerManager::getEndpoint() {
 }
 
 Status BrokerManager::createMessageQueue(std::string topic) {
-  auto it = this->messageQueues.find(topic);
-  if ( it == this->messageQueues.end() )
+  if ( this->messageQueues.find(topic) == this->messageQueues.end() )
   {
     LOG(INFO) << "Creating message queue: " << topic;
     broker::message_queue* mq = new broker::message_queue(topic, *(this->ep));
@@ -78,8 +80,9 @@ broker::message_queue* BrokerManager::getMessageQueue(std::string topic) {
 
 Status BrokerManager::getTopics(std::vector<std::string>& topics) {
   topics.clear();
-  for (auto it = this->messageQueues.begin(); it != this->messageQueues.end(); it++) {
-    topics.push_back(it->first);
+  //for (auto it = this->messageQueues.begin(); it != this->messageQueues.end(); it++) {
+  for (const auto& mq: this->messageQueues) {
+    topics.push_back(mq.first); // append topic
   }
   return Status(0, "OK");
 }
@@ -166,8 +169,8 @@ std::string BrokerManager::getQueryConfigString() {
 
   // Format each query
   std::vector<std::string> scheduleQ;
-  for(auto it = this->brokerQueries.begin(); it != this->brokerQueries.end(); it++) {
-    auto i = it->second;
+  for(const auto& bq: brokerQueries) {
+    auto i = bq.second;
     std::stringstream ss;
     ss << "\"" << std::get<0>(i) <<"\": {\"query\": \"" << std::get<1>(i) << ";\", \"interval\": " << std::get<2>(i) << ", \"added\": " << std::get<3>(i) << ", \"removed\": " << std::get<4>(i) << ", \"snapshot\": " << std::get<5>(i) << "}";
     std::string q = ss.str();
@@ -208,10 +211,10 @@ Status BrokerManager::logQueryLogItemToBro(const QueryLogItem& qli) {
   }  
 
   // Send removed
-  // Not Implemented
+  // TODO: Not Implemented
 
   // Send snapshot
-  // Not Implemented
+  // TODO: Not Implemented
 
   return Status(0, "OK");
 }

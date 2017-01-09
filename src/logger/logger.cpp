@@ -23,8 +23,7 @@ FLAG(string,
 
 Status BroLoggerPlugin::setUp() {
 
-  // TODO
-  // Ensure FLAGS_bro_endpoint is a valid IP/hostname
+  // TODO: Ensure FLAGS_bro_endpoint is a valid IP/hostname
   return Status(0, "OK");
 }
 
