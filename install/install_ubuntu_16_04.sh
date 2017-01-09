@@ -127,51 +127,9 @@ function downloadOsquery() {
   git clone https://github.com/facebook/osquery
   cd osquery
   
-  echo "Patching Osquery"
-  # Patch: stdlib=libstdc++
-  echo "---" > patchfile
-  echo " CMakeLists.txt | 2 +-" >> patchfile
-  echo " 1 file changed, 1 insertion(+), 1 deletion(-)" >> patchfile
-  echo "" >> patchfile
-  echo "diff --git a/CMakeLists.txt b/CMakeLists.txt" >> patchfile
-  echo "index 40a0687..7506ae7 100644" >> patchfile
-  echo "--- a/CMakeLists.txt" >> patchfile
-  echo "+++ b/CMakeLists.txt" >> patchfile
-  echo "@@ -130,7 +130,7 @@ elseif(WIN32)" >> patchfile
-  echo "   set(OS_WHOLELINK_POST \"\")" >> patchfile
-  echo "   set(WINDOWS TRUE)" >> patchfile
-  echo " else()" >> patchfile
-  echo "-  set(CXX_COMPILE_FLAGS \"\${CXX_COMPILE_FLAGS} -std=c++11\")" >> patchfile
-  echo "+  set(CXX_COMPILE_FLAGS \"\${CXX_COMPILE_FLAGS} -std=c++11 -stdlib=libstdc++\")" >> patchfile
-  echo "   set(OS_WHOLELINK_PRE \"-Wl,-whole-archive\")" >> patchfile
-  echo "   set(OS_WHOLELINK_POST \"-Wl,-no-whole-archive\")" >> patchfile
-  echo "   # Set CMAKE variables depending on platform, to know which tables and what" >> patchfile
-  echo "-- " >> patchfile
-  echo "2.7.4" >> patchfile
-  patch -p1 < patchfile
-  # Patch: Make PYTHON_EXECUTABLE point to /usr/local/osquery/bin/python
-  echo "---" > patchfile2
-  echo " CMakeLists.txt | 5 +++--" >> patchfile2
-  echo " 1 file changed, 3 insertions(+), 2 deletions(-)" >> patchfile2
-  echo "" >> patchfile2
-  echo "diff --git a/CMakeLists.txt b/CMakeLists.txt" >> patchfile2
-  echo "index 40a0687..38a61a2 100644" >> patchfile2
-  echo "--- a/CMakeLists.txt" >> patchfile2
-  echo "+++ b/CMakeLists.txt" >> patchfile2
-  echo "@@ -78,8 +78,8 @@ endif()" >> patchfile2
-  echo " set(C_COMPILE_FLAGS \"\")" >> patchfile2
-  echo " set(CXX_COMPILE_FLAGS \"\")" >> patchfile2
-  echo " " >> patchfile2
-  echo "-find_program(PYTHON_EXECUTABLE \"python\" ENV PATH)" >> patchfile2
-  echo "-find_program(THRIFT_COMPILER \"thrift\" ENV PATH)" >> patchfile2
-  echo "+find_program(PYTHON_EXECUTABLE \"python\" \${BUILD_DEPS} ENV PATH)" >> patchfile2
-  echo "+find_program(THRIFT_COMPILER \"thrift\" \${BUILD_DEPS} ENV PATH)" >> patchfile2
-  echo " " >> patchfile2
-  echo " # Use osquery language to set platform/os" >> patchfile2
-  echo " if(DEFINED ENV{OSQUERY_PLATFORM})" >> patchfile2
-  echo "-- " >> patchfile2
-  echo "1.9.1" >> patchfile2
-  patch -p1 < patchfile2
+#  echo "Patching Osquery"
+#  # Patch: stdlib=libstdc++
+#  # applied with commit ae19b7797dfc6e66e5880d20eedfa795b2552094
  fi
 
   cd $tmp_dir
