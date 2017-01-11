@@ -4,6 +4,7 @@
 ##
 ## Clean installed stuff (in /usr/local/) with: 
 ##  sudo rm -rf /usr/local/lib/libcaf_* /usr/local/include/caf/ /usr/local/lib/libbroker.so* /usr/local/include/broker/ /usr/local/lib/libosquery.a /usr/local/include/osquery/
+##  sudo rm -rf /usr/local/osquery
 ##  sudo rm /usr/local/bin/osqueryi /usr/local/bin/osqueryd
 ##
 ## Clean downloaded stuff by this script:
