@@ -1,7 +1,7 @@
 #include <exception>
 
 #include <osquery/filesystem.h>
-#include <osquery/flags.h>
+//#include <osquery/flags.h>
 #include <osquery/logger.h>
 
 #include <broker/broker.hh>
@@ -15,19 +15,14 @@
 
 namespace osquery {
 
-// Register external? - Currently results only, no error log
-FLAG(string,
-     bro_endpoint,
-     "127.0.0.1",
-     "IP Address for ERROR/WARN/INFO and results logging (Bro Endpoint)");
-
 Status BroLoggerPlugin::setUp() {
 
   // TODO: Ensure FLAGS_bro_endpoint is a valid IP/hostname
   return Status(0, "OK");
 }
 
-Status BroLoggerPlugin::logString(const std::string& s) { 
+Status BroLoggerPlugin::logString(const std::string& s) {
+    //LOG(ERROR) << "logString = " << s;
   // Log Methods for QueryLogItems only?
   QueryLogItem item;
   Status status = deserializeQueryLogItemJSON(s, item);
@@ -41,11 +36,12 @@ Status BroLoggerPlugin::logString(const std::string& s) {
 }
 
 Status BroLoggerPlugin::logSnapshot(const std::string& s) {
-  // NOT IMPLEMENTED
-  return Status(1, "Not Implemented");
+    //LOG(ERROR) << "logSnapshot = " << s;
+  return this->logString(s);
 }
 
 Status BroLoggerPlugin::logStatus(const std::vector<StatusLogLine>& log) {
+    LOG(ERROR) << "logStatus = ";
   // NOT IMPLEMENTED
   return Status(1, "Not implemented");
 }

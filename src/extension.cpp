@@ -1,8 +1,11 @@
 #include <osquery/sdk.h>
+#include <osquery/flags.h>
 #include <osquery/system.h>
+//#include <osquery/database.h>
 
 #include "logger/logger.h"
 #include "BrokerManager.h"
+//#include "Parser.h"
 #include <utils.h>
 
 #include <broker/broker.hh>
@@ -15,7 +18,17 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+//#include <libconfig.h++>
+
 using namespace osquery;
+
+// Define config flags
+namespace osquery {
+    EXTENSION_FLAG(string,
+            bro_endpoint,
+            "172.17.0.2",
+            "IP Address for ERROR/WARN/INFO and results logging (Bro Endpoint)");
+}
 
 REGISTER_EXTERNAL(BroLoggerPlugin, "logger", "bro");
 
@@ -27,9 +40,18 @@ void signalHandler( int signum ) {
   exit(signum);
 }
 
+
 int main(int argc, char* argv[]) {
 
   signal(SIGINT, signalHandler);
+
+    /*
+    // Init Config
+    Parser* parser = Parser::getInstance();
+    parser->parseConfig("/usr/local/etc/brosquery/config.ini");
+    std::string welt = parser->getConfig()->lookup("hallo");
+    LOG(ERROR) << "welt = " << welt;
+    */
   
   // Setup OSquery Extension
   Initializer runner(argc, argv, ToolType::EXTENSION);
@@ -52,7 +74,8 @@ int main(int argc, char* argv[]) {
   std::string uid = bm->getNodeID();
   bm->createMessageQueue("/osquery/uid/" + uid);
   // Connect to Bro
-  auto status_broker = bm->peerEndpoint("172.17.0.2", 9999);
+  LOG(INFO) << "Connecting to " << FLAGS_bro_endpoint;
+  auto status_broker = bm->peerEndpoint(FLAGS_bro_endpoint, 9999);
   if (!status_broker.ok()) {
     LOG(ERROR) << status_broker.getMessage();
     runner.requestShutdown(status_broker.getCode());
@@ -95,8 +118,52 @@ int main(int argc, char* argv[]) {
           // Check Event Type
           std::string eventName = broker::to_string(msg[0]);
           LOG(INFO) << "Received event '" << eventName << "' on topic '" << topic << "'";
-          
-          if ( eventName == "add_osquery_query" ) {
+
+          if ( eventName == "execute_osquery_query" ) {
+              // TODO: How should responses to a query look like that has no results?
+              //    a) Only sending results as they are available (we might can do this asynchronously via logger)
+              //    b) Sending empty results if no result available (we have to actively check/wait for request exec)
+              //a)
+              std::string response_event = broker::to_string(msg[1]);
+              std::string query = to_string(msg[2]);
+
+              // Execute the query
+              LOG(INFO) << "Executing one-time query: " << response_event << ": " << query;
+              QueryData results;
+              auto status_query = osquery::queryExternal(query, results);
+              if (!status_query.ok()) {
+                  LOG(ERROR) << status_query.getMessage();
+                  runner.requestShutdown(status_query.getCode());
+              }
+
+              // Assemble a response item (as snapshot)
+              QueryLogItem item;
+              item.name = query; // Hack: the actual sql query
+              item.identifier = response_event; // Hack: the response event name
+              item.time = osquery::getUnixTime();
+              item.calendar_time = osquery::getAsciiTime();
+              item.snapshot_results = std::move(results);
+
+              //printQueryLogItem(item);
+
+              // Send snapshot to the logger
+              std::string registry_name = "logger";
+              std::string item_name = "bro";
+              std::string json;
+              serializeQueryLogItemJSON(item, json);
+              printQueryLogItemJSON(json);
+              PluginRequest request = {{"snapshot", json}, {"category", "event"}};
+              auto status_call = osquery::Registry::call(registry_name, item_name, request);
+              if (!status_call.ok()) {
+                  std::string error = "Error logging the results of one-time query: " + query + ": " +
+                          status_call.toString();
+                  LOG(ERROR) << error;
+                  Initializer::requestShutdown(EXIT_CATASTROPHIC, error);
+              }
+
+              continue;
+
+          } else if ( eventName == "add_osquery_query" ) {
           // New SQL Query Request
             QueryRequest qr;
             qr.query = broker::to_string(msg[2]);
@@ -113,8 +180,8 @@ int main(int argc, char* argv[]) {
 
           } else {
           // Unkown Message
-            LOG(ERROR) << "Unknown Event Name: '" << eventName << "'";
-            LOG(ERROR) << "\t" << broker::to_string(msg);
+            //LOG(ERROR) << "Unknown Event Name: '" << eventName << "'";
+            //LOG(ERROR) << "\t" << broker::to_string(msg);
             continue;
           }
 
@@ -122,7 +189,7 @@ int main(int argc, char* argv[]) {
           std::map<std::string, std::string> config;
           config["data"] = bm->getQueryConfigString();
           LOG(INFO) << "Applying new config: " << config["data"];
-          Config::getInstance().update(config);
+          osquery::Config::getInstance().update(config);
         }
       }
     }

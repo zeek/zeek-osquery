@@ -71,7 +71,7 @@ class BrokerManager {
 
     Status logQueryLogItemToBro(const QueryLogItem& qli);
 
-    Status logQueryLogItemRowToBro(const std::string queryID, const osquery::Row& row, const std::string& trigger);
+    Status logQueryLogItemRowToBro(const std::string queryID, const std::string identifier, const osquery::Row& row, const std::string& trigger);
 
   private:
     // The singleton object
