@@ -16,7 +16,6 @@ namespace osquery {
 BrokerManager* BrokerManager::_instance = nullptr;
 
 BrokerManager::BrokerManager() {
-
 }
 
 void BrokerManager::printThis(std::string s) {
@@ -207,30 +206,44 @@ Status BrokerManager::logQueryLogItemToBro(const QueryLogItem& qli) {
 
   // Send added
   for (const auto& row: qli.results.added) {
-    this->logQueryLogItemRowToBro(queryID, row, "added");
+    this->logQueryLogItemRowToBro(queryID, identifier, row, "added");
   }  
 
   // Send removed
   // TODO: Not Implemented
 
   // Send snapshot
-  // TODO: Not Implemented
+    for (const auto& row: qli.snapshot_results) {
+        this->logQueryLogItemRowToBro(queryID, identifier, row, "snapshot");
+    }
+    // TODO: Not Implemented
 
   return Status(0, "OK");
 }
   
-Status BrokerManager::logQueryLogItemRowToBro(const std::string queryID, const osquery::Row& row, const std::string& trigger) {
+Status BrokerManager::logQueryLogItemRowToBro(const std::string queryID, const std::string identifier, const osquery::Row& row, const std::string& trigger) {
   // Create Event Message
   broker::message msg;
+
   // Set Event_Name
-  std::string event_name = this->eventNames.at(queryID);
+  std::string event_name;
+  if (trigger == "snapshot")
+    event_name = identifier;
+  else if (trigger == "added")
+    event_name = this->eventNames.at(queryID);
+
   LOG(INFO) << "Creating message for event with name :'" << event_name << "'";
   msg.push_back(event_name);
 
+  std::string query;
   // Get Info about SQL Query and Types
-  BrokerQueryEntry bqe = this->brokerQueries.at(queryID);
+  if (trigger == "snapshot")
+    query = queryID;
+  else if (trigger == "added") {
+    BrokerQueryEntry bqe = this->brokerQueries.at(queryID);
+    query = std::get<1>(bqe);
+  }
   TableColumns columns;
-  std::string query = std::get<1>(bqe);
   Status status = getQueryColumnsExternal(query, columns);
   std::map<std::string, ColumnType> columnTypes;
   for (std::tuple<std::string, ColumnType, ColumnOptions> t: columns) {
@@ -281,7 +294,14 @@ Status BrokerManager::logQueryLogItemRowToBro(const std::string queryID, const o
   }
 
   // Create and Send Broker Event Message
-  std::string topic = this->eventTopics.at(queryID);
+  std::string topic;
+  if (trigger == "snapshot") {
+      // TODO: Make dynamic (set when receiving the request)
+    std::string uid = this->getNodeID();
+    topic = "/osquery/uid/" + uid;
+  } else if (trigger == "added")
+    topic = this->eventTopics.at(queryID);
+
   if ( this->ep == nullptr )
   {
     LOG(ERROR) << "Endpoint not set yet!";

@@ -19,11 +19,19 @@ void printColumnsInfo(const std::string& q) {
   }
 }
 
-Status printQueryLogItemJSON(const std::string& json_string) {
-  LOG(INFO) << "QueryLogItemJSON to parse: " << json_string;
-  QueryLogItem item;
-  Status status = deserializeQueryLogItemJSON(json_string, item);
-  if ( status.getCode() == 0 ) {
+    Status printQueryLogItemJSON(const std::string& json_string) {
+      LOG(INFO) << "QueryLogItemJSON to parse: " << json_string;
+      QueryLogItem item;
+      Status status = deserializeQueryLogItemJSON(json_string, item);
+      if ( status.getCode() == 0 ) {
+        return printQueryLogItem(item);
+      } else {
+        LOG(ERROR) << "Failed to parse Json Query Log Item" << std::endl;
+        return Status(1, "Failed to parse");
+      }
+    }
+
+Status printQueryLogItem(const QueryLogItem& item) {
     LOG(INFO) << "Parsed query result" << std::endl;
     LOG(INFO) << "\tDiffResults: " << std::endl;
       printDiffResults(item.results);
@@ -35,10 +43,6 @@ Status printQueryLogItemJSON(const std::string& json_string) {
     LOG(INFO) << "\tcalendar_time: " << item.calendar_time;
     LOG(INFO) << "\tdecorations: " << std::endl;
       printDecorations(item.decorations);
-  } else {
-    LOG(ERROR) << "Failed to parse Json Query Log Item" << std::endl;
-    return Status(1, "Failed to parse");
-  }
   return Status(0, "OK");
 }
 

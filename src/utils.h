@@ -16,7 +16,7 @@ void printColumnsInfo(const std::string& q);
 
 Status printQueryLogItemJSON(const std::string& json_string);
 
-Status printQueryLogItemJSON(const std::string& json_string);
+Status printQueryLogItem(const QueryLogItem& item);
 
 void printDiffResults(const DiffResults& results);
 
