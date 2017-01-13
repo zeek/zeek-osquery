@@ -1,17 +1,23 @@
 #include <osquery/sdk.h>
 #include <osquery/system.h>
 
+#include "BrokerManager.h"
+
+#include <broker/broker.hh>
+#include <broker/endpoint.hh>
+#include <broker/message_queue.hh>
+#include <broker/report.hh>
+
 #include <iostream>
 
 namespace osquery {
 
-/**
- * @brief prints information about the columns requested by the given query
- * 
- * Asks the SQL Database about the table schema and retrieves column names/types
- *
- * @param q the input query
-**/
+    Status createSubscriptionRequest(const broker::message& msg, std::string incoming_topic, SubscriptionRequest& sr);
+
+/////////////////////////////////////////////////////////
+//////////////// Print Debug Methods/////////////////////
+/////////////////////////////////////////////////////////
+
 void printColumnsInfo(const std::string& q);
 
 Status printQueryLogItemJSON(const std::string& json_string);

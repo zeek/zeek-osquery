@@ -135,13 +135,38 @@ int main(int argc, char* argv[]) {
           std::string eventName = broker::to_string(msg[0]);
           LOG(INFO) << "Received event '" << eventName << "' on topic '" << topic << "'";
 
-          if ( eventName == "host_query" ) {
+          if ( eventName == "osquery::host_query" ) {
+          // One-Time Query Execution
               // TODO: How should responses to a query look like that has no results?
               //    a) Only sending results as they are available (we might can do this asynchronously via logger)
               //    b) Sending empty results if no result available (we have to actively check/wait for request exec)
               //a)
+              SubscriptionRequest sr;
+              createSubscriptionRequest(msg, topic, sr);
+              std::string newQID = bm->addBrokerOneTimeQueryEntry(sr);
+              if (newQID=="-1") {
+                  LOG(ERROR) << "Unable to add Broker Query Entry";
+                  runner.requestShutdown(1);
+              }
+
+              // Execute the query
+              LOG(INFO) << "Executing one-time query: " << sr.response_event << ": " << sr.query;
+              QueryData results;
+              auto status_query = osquery::queryExternal(sr.query, results);
+              if (!status_query.ok()) {
+                  LOG(ERROR) << status_query.getMessage();
+                  runner.requestShutdown(status_query.getCode());
+              }
+
+              if (results.empty()) {
+                  LOG(INFO) << "One-time query: " << sr.response_event << " has no results";
+                  bm->removeBrokerQueryEntry(sr.query);
+                  continue;
+              }
+              /*
               std::string response_event = broker::to_string(msg[1]);
               std::string query = broker::to_string(msg[2]);
+
 
               // Execute the query
               LOG(INFO) << "Executing one-time query: " << response_event << ": " << query;
@@ -151,14 +176,15 @@ int main(int argc, char* argv[]) {
                   LOG(ERROR) << status_query.getMessage();
                   runner.requestShutdown(status_query.getCode());
               }
+               */
 
               // Assemble a response item (as snapshot)
               QueryLogItem item;
-              item.name = query; // Hack: the actual sql query
-              item.identifier = response_event; // Hack: the response event name
+              item.name = newQID;
+              item.identifier = osquery::getHostIdentifier();
               item.time = osquery::getUnixTime();
               item.calendar_time = osquery::getAsciiTime();
-              item.snapshot_results = std::move(results);
+              item.snapshot_results = results;
 
               //printQueryLogItem(item);
 
@@ -171,7 +197,7 @@ int main(int argc, char* argv[]) {
               PluginRequest request = {{"snapshot", json}, {"category", "event"}};
               auto status_call = osquery::Registry::call(registry_name, item_name, request);
               if (!status_call.ok()) {
-                  std::string error = "Error logging the results of one-time query: " + query + ": " +
+                  std::string error = "Error logging the results of one-time query: " + sr.query + ": " +
                           status_call.toString();
                   LOG(ERROR) << error;
                   Initializer::requestShutdown(EXIT_CATASTROPHIC, error);
@@ -179,33 +205,20 @@ int main(int argc, char* argv[]) {
 
               continue;
 
-          } else if ( eventName == "host_subscribe" ) {
+          } else if ( eventName == "osquery::host_subscribe" ) {
           // New SQL Query Request
             SubscriptionRequest sr;
-            sr.query = broker::to_string(msg[2]);
-            sr.response_event = broker::to_string(msg[1]);
-            // The topic where the request was received
-            sr.response_topic = topic; // TODO: or use custom as optionally specified in msg
-            std::string update_type = broker::to_string(msg[3]);
-            if (update_type == "ADDED") {
-                sr.added = true; sr.removed = false; }
-            else if (update_type == "REMOVED") {
-                sr.added = false; sr.removed = true; }
-            else if (update_type == "ADDED") {
-                sr.added = true; sr.removed = true; }
-            else {
-                LOG(ERROR) << "Unknown update type: " << update_type;
-                runner.requestShutdown(1);
-            }
+            createSubscriptionRequest(msg, topic, sr);
 
-            sr.init_dump = broker::get<bool>(msg[4]);
+            bm->addBrokerScheduleQueryEntry(sr);
 
-            bm->addBrokerQueryEntry(sr);
-
-          } else if ( eventName == "host_unsubscribe" ) {
+          } else if ( eventName == "osquery::host_unsubscribe" ) {
           // SQL Query Cancel
+            SubscriptionRequest sr;
+            createSubscriptionRequest(msg, topic, sr);
             //TODO: find an UNIQUE identifier (currently the exact sql string)
-            std::string query = broker::to_string(msg[1]);
+            std::string query = sr.query;
+
             bm->removeBrokerQueryEntry(query);
 
           } else {

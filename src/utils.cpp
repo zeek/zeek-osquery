@@ -3,9 +3,44 @@
 
 #include <utils.h>
 
+#include <broker/broker.hh>
+#include <broker/endpoint.hh>
+#include <broker/message_queue.hh>
+#include <broker/report.hh>
+
 #include <iostream>
 
 namespace osquery {
+
+    Status createSubscriptionRequest(const broker::message& msg, std::string incoming_topic, SubscriptionRequest& sr) {
+
+        sr.query = broker::to_string(msg[2]);
+        sr.response_event = broker::to_string(msg[1]);
+        // The topic where the request was received
+        sr.response_topic = incoming_topic; // TODO: or use custom as optionally specified in msg
+        std::string update_type = broker::to_string(msg[3]);
+        if (update_type == "ADDED") {
+            sr.added = true; sr.removed = false; sr.snapshot = false;
+        } else if (update_type == "REMOVED") {
+            sr.added = false; sr.removed = true; sr.snapshot = false;
+        } else if (update_type == "BOTH") {
+            sr.added = true; sr.removed = true; sr.snapshot = false;
+        } else if (update_type == "SNAPSHOT") {
+            sr.added = false; sr.removed = false; sr.snapshot = true;
+        } else {
+            LOG(ERROR) << "Unknown update type: " << update_type;
+            return Status(1, "Failed to create Subscription Request");
+        }
+
+        if (sr.added or sr.removed)
+            sr.init_dump = broker::get<bool>(msg[4]);
+
+        return Status(0,"OK");
+    }
+
+/////////////////////////////////////////////////////////
+//////////////// Print Debug Methods/////////////////////
+/////////////////////////////////////////////////////////
 
 void printColumnsInfo(const std::string& q) {
 // Query Information

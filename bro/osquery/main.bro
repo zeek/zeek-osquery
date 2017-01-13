@@ -46,7 +46,8 @@ export {
 	type UpdateType: enum {
 		ADD,	##< Report new elements.
 		REMOVE,	##< Report removed element.
-		BOTH	##< Report both new and removed elements.
+		BOTH,	##< Report both new and removed elements.
+#		SNAPSHOT##< Report the results of one-time query
 	};
 
 	## Type defining a single event to subscribe to.
@@ -102,6 +103,13 @@ export {
 	## net: IP space this unsubscription applies to.
         global unsubscribe_multiple: function(evs: vector of Event, net: subnet &default=0.0.0.0/0);
 
+	## Send an one-time query to all current clients with a matching address.
+	##
+	## ev: The event to execute.
+        ##
+        ## net: IP space this query applies to.
+	global execute_query: function(ev: Event, net: subnet &default=0.0.0.0/0);
+
         ## Associate a group with a host. This will tell the host to post to a
         ## corresponding group topic. The local Bro will automatically subscribe to that,
         ## but other receivers potentially talking to the same host will ignore the
@@ -116,7 +124,7 @@ export {
 	##
 	## client_id: An id that uniquely identifies an osquery host 
         ## addr_list: A list of IP addresses of that osquery host
-        global host_new: event(client_id: string, addr_list: vector of addr, group_list: vector of string);
+#        global host_new: event(client_id: string, addr_list: vector of addr, group_list: vector of string);
 
 	# Event sent by clients to report an error.
 	#
@@ -146,7 +154,7 @@ global host_subscribe: event(ev: string, query: string, utype: string, initdump:
 global host_unsubscribe: event(ev: string, query: string, utype: string, initdump: bool);
 
 # Sent by us to the client for one-time query execution
-global host_query: event(ev: string, query:string);
+global host_query: event(ev: string, query:string, utype: string);
 
 # Sent by us to set the topic for the client to publish its events with.
 #global host_set_topic: event(topic: string);
@@ -171,7 +179,7 @@ global hosts: set[string];
 global host_addresses: table[string] of vector of addr;
 
 # Internal table for tracking client (ids) and their respective groups
-global host_groups: table[string] of string;# &default="default";
+global host_groups: table[string] of vector of string;# &default="default";
 #global groups: set[string, vector of string];
 
 
@@ -213,10 +221,10 @@ function log_local(level: string, msg: string)
 	}
 
 ###
-### Subscription Functions 
+### Subscription Sending
 ###
 
-## Sends the subscription given by ev to the client
+## Sends the interest given by ev to the client
 ##
 ## client_id: The client ID
 ## ev: The event of type Event
@@ -224,10 +232,12 @@ function send_subscribe(client_id: string, ev: Event)
 	{
 	local init_dump = ev$init_dump;
 	local ev_name = split_string(fmt("%s", ev$ev), /\n/)[0];
-        local host_topic = fmt("/osquery/uid/%s", client_id);
+        local host_topic = fmt("/bro/osquery/uid/%s", client_id);
 	
 	log_peer("info", client_id, fmt("%s event %s() with '%s'",
 					"subscribing to", ev_name, ev$query));
+        print fmt("%s event %s() with '%s'",
+                                        "subscribing to", ev_name, ev$query);
 
 	local update_type = "BOTH";
 	if ( ev$utype == ADD )
@@ -242,12 +252,15 @@ function send_subscribe(client_id: string, ev: Event)
 
 function send_unsubscribe(peer_name: string, ev: Event)
 	{
+	print "entering send_unsubscribe";
 	local init_dump = ev$init_dump;
 	local ev_name = split_string(fmt("%s", ev$ev), /\n/)[0];
-	local host_topic = fmt("/bro/osquery/host/%s", peer_name);
+	local host_topic = fmt("/bro/osquery/uid/%s", peer_name);
 	
 	log_peer("info", peer_name, fmt("%s event %s() with '%s'",
 					"unsubscribing from", ev_name, ev$query));
+	print fmt("%s event %s() with '%s'",
+                                        "unsubscribing from", ev_name, ev$query);
 
 	local update_type = "BOTH";
 
@@ -267,79 +280,6 @@ function same_event(ev1: Event, ev2: Event) : bool
 	       ev1$utype == ev2$utype && ev1$init_dump == ev2$init_dump;
 	}
 
-#function subscribe(ev: Event, net: subnet)
-#	{
-#	subscriptions[|subscriptions|] = [$net=net, $ev=ev];
-#
-#	# Subscribe from current clients.
-#	for ( [ip, peer_name] in hosts ) 
-#		{
-#		if ( ip !in net )
-#			next;
-#		
-#		send_subscribe(peer_name, ev);
-#		}
-#	}
-
-#function unsubscribe(ev: Event, net: subnet)
-#	{
-#	for ( i in subscriptions )
-#		{
-#		if ( same_event(subscriptions[i]$ev, ev) )
-#			# Don't have a delete for vector, so set it to no-op
-#      # by leaving the event empty.
-#      subscriptions[i]$ev = [$query=""];
-#		}
-#
-#	# Unsubscribe from current clients.
-#  for ( [ip, peer_name] in hosts ) 
-#		{
-#		if ( ip !in net )
-#			next;
-#		
-#		send_unsubscribe(peer_name, ev);
-#		}
-#	}
-
-function subscribe_multiple(evs: vector of Event, net: subnet)
-	{
-	for ( i in evs )
-		subscribe(evs[i], net);
-	}
-
-function unsubscribe_multiple(evs: vector of Event, net: subnet)
-	{
-	for ( i in evs )
-		unsubscribe(evs[i], net);
-	}
-
-## Sends current subscriptions to the osquery host (given by client_id)
-## if the subscription subnet filter matches at least one of the hosts IPs.
-##
-## client_id: The client ID
-function send_subscriptions(client_id: string)
-	{
-	for ( i in subscriptions )
-		{
-		local s = subscriptions[i];
-
-		if ( ! s?$ev )
-			next;
-
-		for ( ip in host_addresses[client_id]) 
-			print "IP %s", ip;
-			print "net %s", s$net;
-			local net = s$net;
-			{
-			if ( ip in net ) 
-				{
-				send_subscribe(client_id, s$ev);
-				break;
-				}
-			}
-		}
-	}
-
 #function set_host_group(peer_name: string, group: string)
 #	{
 #	if ( group !in groups )
@@ -352,6 +292,144 @@ function send_subscriptions(client_id: string)
 #
 #	host_groups[peer_name] = group;
 #	}
+
+function send_query(client_id: string, ev: Event)
+        {
+        local ev_name = split_string(fmt("%s", ev$ev), /\n/)[0];
+        local host_topic = fmt("/bro/osquery/uid/%s", client_id);
+
+        log_peer("info", client_id, fmt("%s event %s() with '%s'", 
+                                        "subscribing to", ev_name, ev$query));
+        print fmt("%s event %s() with '%s'",
+                                        "executing", ev_name, ev$query);
+
+        local ev_args = Broker::event_args(host_query, ev_name, ev$query, "SNAPSHOT");
+        Broker::send_event(host_topic, ev_args);
+        }
+
+## Sends current subscriptions to the osquery host (given by client_id)
+## if the subscription subnet filter matches at least one of the hosts IPs.
+##
+## client_id: The client ID
+function send_subscriptions(client_id: string)
+        {
+	print "Entering: send_subscriptions";
+        for ( i in subscriptions )
+                {
+                local s = subscriptions[i];
+
+                if ( ! s?$ev ) 
+			{
+                        print "Skipping Subscription because event is empty!";
+                        next;
+			}
+
+                for ( j in host_addresses[client_id])
+                        {
+                        local ip = host_addresses[client_id][j];
+                        print "IP %s", ip;
+                        print "net %s", s$net;
+                        local net: subnet;
+                        net = s$net;
+                        if ( ip in net )
+                                {
+                                send_subscribe(client_id, s$ev);
+                                break;
+                                }
+                        }
+                }
+        }
+
+###
+### Subscription Management
+###
+### The framework keeps track of subscriptions and clients to match them .
+### We need functions whenever subscription or clients change.
+###
+
+function subscribe(ev: Event, net: subnet)
+        {
+        # Include new Subscription in the vector
+        subscriptions[|subscriptions|] = [$net=net, $ev=ev];
+        print "New Subscription Vector: ", subscriptions;
+
+        for ( client_id in hosts )
+                {
+                local j: int;
+                for ( j in host_addresses[client_id])
+                        {
+                        local ip: addr;
+                        ip = host_addresses[client_id][j];
+                        if ( ip in net )
+                                {
+                                send_subscribe(client_id, ev);
+                                break;
+                                }
+                 
+                        }
+                }
+        }
+
+function unsubscribe(ev: Event, net: subnet)
+       {
+	print "entering 'unsubscribe'";
+       for ( i in subscriptions )
+               {
+               if ( same_event(subscriptions[i]$ev, ev) )
+			print "Disabling event";
+			# Don't have a delete for vector, so set it to no-op
+      			# by leaving the event empty.
+			subscriptions[i]$ev = [$query=""];
+               }
+
+	# Unsubscribe from current clients.
+	for ( client_id in hosts )
+                {
+                local j: int;
+                for ( j in host_addresses[client_id])
+                        {
+                        local ip: addr;
+                        ip = host_addresses[client_id][j];
+                        if ( ip in net )
+                                {
+                                send_unsubscribe(client_id, ev);
+                                break;
+                                }
+
+                        }
+                }
+        }
+
+function subscribe_multiple(evs: vector of Event, net: subnet)
+        {
+        for ( i in evs )
+                subscribe(evs[i], net);
+        }
+
+function unsubscribe_multiple(evs: vector of Event, net: subnet)
+        {
+        for ( i in evs )
+                unsubscribe(evs[i], net);
+        }
+
+function execute_query(ev: Event, net: subnet)
+	{
+	for ( client_id in hosts )
+                {
+                local j: int;
+                for ( j in host_addresses[client_id])
+                        {
+                        local ip: addr;
+                        ip = host_addresses[client_id][j];
+                        if ( ip in net )
+                                {
+                                send_query(client_id, ev);
+                                break;
+                                }
+
+                        }
+                }
+        }
 
 
 ###############################
@@ -369,7 +447,7 @@ event bro_init()
 	# whatever another one is doing.
 	Broker::enable();
 
-	local topic = "/bro/osquery/announce";
+	local topic = "/bro/osquery/announces";
 	log_local("info", fmt("subscribing to topic %s", topic));
 	Broker::subscribe_to_events(topic);
 
@@ -400,15 +478,18 @@ event host_error(peer_name: string, msg: string)
 ### Host Tracking
 ###
 
-event new_osquery_host(client_id: string, addr_list: vector of addr, group_list: vector of string)
-{
+#event host_new(client_id: string, addr_list: vector of addr, group_list: vector of string)
+event host_new(client_id: string, group_list: vector of string, addr_list: vector of addr)
+	{
+	print "New Host Annoucement", client_id, group_list, addr_list;
 	log_local("info", fmt("Received new announce message with uid %s", client_id));
 	log_peer("info", client_id, "New osquery host announcement");
 
 	# Internal client tracking
 	add hosts[client_id];
-	host_addresses = addr_list;
-	host_groups = group_list;
+	host_addresses[client_id] = addr_list;
+	print fmt("host_addresses[%s] = ", client_id), host_addresses[client_id];
+	host_groups[client_id] = group_list;
 
 	# Host individual topic
 	local host_topic = fmt("/bro/osquery/uid/%s", client_id);
@@ -416,16 +497,17 @@ event new_osquery_host(client_id: string, addr_list: vector of addr, group_list:
         # TODO: Only when there is a subscription for the IP
 	Broker::subscribe_to_events(host_topic);
 	send_subscriptions(client_id);
-}
+	}
 
 #TODO: Handle peer_name and client_id
 event Broker::incoming_connection_established(peer_name: string)
 	{
+	print "incoming connection";
 	log_peer("info", peer_name, "incoming connection established");
 	}
 
 event Broker::connection_incoming_connection_broken(peer_name: string)
 	{
 	local ip = to_addr(peer_name);
-	delete hosts[ip, peer_name];
-
+	delete hosts[peer_name];
+	}

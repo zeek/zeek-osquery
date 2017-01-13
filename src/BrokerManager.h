@@ -1,3 +1,5 @@
+#pragma once
+
 #include <osquery/sdk.h>
 #include <osquery/system.h>
 
@@ -11,19 +13,19 @@
 namespace osquery {
 
   //ID, query, interval, added, removed, snapshot
-  typedef std::tuple<std::string, std::string, int, bool, bool, bool> BrokerQueryEntry;
+  typedef std::tuple<std::string, std::string, int, bool, bool, bool> BrokerScheduleQueryEntry;
+  typedef std::tuple<std::string, std::string> BrokerOneTimeQueryEntry;
 
-  struct SubscriptionRequest {
-    std::string query; // The requested SQL query
-    std::string response_event; // The event name for the response event
-    std::string response_topic; // The topic name for the response event
-    int interval = 30;
-    bool added = true;
-    bool removed = false;
-    bool snapshot = false;
-    bool init_dump = false;
-  };
-
+    struct SubscriptionRequest {
+        std::string query; // The requested SQL query
+        std::string response_event; // The event name for the response event
+        std::string response_topic; // The topic name for the response event
+        int interval = 10;
+        bool added = true;
+        bool removed = false;
+        bool snapshot = false;
+        bool init_dump = false;
+    };
 
 class BrokerManager {
   
@@ -58,10 +60,11 @@ class BrokerManager {
 
     osquery::Status peerEndpoint(std::string ip, int port);
 
+    std::string addBrokerOneTimeQueryEntry(const SubscriptionRequest& qr);
 
-    osquery::Status addBrokerQueryEntry(const SubscriptionRequest& qr);
+    osquery::Status addBrokerScheduleQueryEntry(const SubscriptionRequest& qr);
 
-    osquery::Status addBrokerQueryEntry(const std::string& queryID, const SubscriptionRequest& qr);
+    osquery::Status addBrokerQueryEntry(const std::string& queryID, const SubscriptionRequest& qr, std::string qtype);
 
     std::string findIDForQuery(const std::string& query);
 
@@ -85,7 +88,9 @@ class BrokerManager {
     // Next unique QueryID
     int _nextUID = 1;
     // Collection of SQL Subscription queries, Key: QueryID
-    std::map<std::string, BrokerQueryEntry> brokerQueries;
+    std::map<std::string, BrokerScheduleQueryEntry> brokerScheduleQueries;
+    // Collection of SQL One-Time Subscription queries, Key: QueryID
+    std::map<std::string, BrokerOneTimeQueryEntry> brokerOneTimeQueries;
     
 
     // Some mapping to maintain the SQL subscriptions

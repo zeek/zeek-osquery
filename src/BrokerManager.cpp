@@ -13,6 +13,8 @@
 
 namespace osquery {
 
+
+
 BrokerManager* BrokerManager::_instance = nullptr;
 
 BrokerManager::BrokerManager() {
@@ -109,12 +111,20 @@ Status BrokerManager::peerEndpoint(std::string ip, int port) {
 //////////////// Schedule/Query Handling ////////////////
 /////////////////////////////////////////////////////////
 
-Status BrokerManager::addBrokerQueryEntry(const SubscriptionRequest& qr) {
-  const std::string queryID = std::to_string(this->_nextUID++);
-  return addBrokerQueryEntry(queryID, qr);
+std::string BrokerManager::addBrokerOneTimeQueryEntry(const SubscriptionRequest& qr) {
+    const std::string queryID = std::to_string(this->_nextUID++);
+    if ( addBrokerQueryEntry(queryID, qr, "ONETIME").ok() )
+        return queryID;
+    else
+        return "-1";
 }
 
-Status BrokerManager::addBrokerQueryEntry(const std::string& queryID, const SubscriptionRequest& qr) {
+osquery::Status BrokerManager::addBrokerScheduleQueryEntry(const SubscriptionRequest& qr) {
+  const std::string queryID = std::to_string(this->_nextUID++);
+  return addBrokerQueryEntry(queryID, qr, "SCHEDULE");
+}
+
+Status BrokerManager::addBrokerQueryEntry(const std::string& queryID, const SubscriptionRequest& qr, std::string qtype) {
   std::string query = qr.query;
   std::string response_event = qr.response_event;
   std::string response_topic = qr.response_topic;
@@ -122,29 +132,45 @@ Status BrokerManager::addBrokerQueryEntry(const std::string& queryID, const Subs
   bool added = qr.added;
   bool removed = qr.removed;
   bool snapshot = qr.snapshot;
-  if ( this->brokerQueries.find(queryID) != this->brokerQueries.end() ) 
+  if ( this->brokerScheduleQueries.find(queryID) != this->brokerScheduleQueries.end() or
+       this->brokerOneTimeQueries.find(queryID) != this->brokerOneTimeQueries.end())
   {
     LOG(ERROR) << "QueryID '" << queryID << "' already exists";
     return Status(1, "Duplicate queryID");
   }
 
-  this->brokerQueries[queryID] = BrokerQueryEntry{queryID, query, interval, added, removed, snapshot};
+  if (qtype=="SCHEDULE")
+    this->brokerScheduleQueries[queryID] = BrokerScheduleQueryEntry{queryID, query, interval, added, removed, snapshot};
+  else if (qtype=="ONETIME")
+    this->brokerOneTimeQueries[queryID] = BrokerOneTimeQueryEntry{queryID, query};
+  else
+    LOG(ERROR) << "Unknown query type :" << qtype;
   this->eventNames[queryID] = response_event;
   this->eventTopics[queryID] = response_topic;
   return Status(0, "OK");
 }
 
+
 std::string BrokerManager::findIDForQuery(const std::string& query) {
   // Search the queryID for this specific query
-  for (const auto& e: this->brokerQueries) {
+  for (const auto& e: this->brokerScheduleQueries) {
     std::string queryID = e.first;
-    BrokerQueryEntry bqe = e.second;
+    BrokerScheduleQueryEntry bqe = e.second;
     if ( std::get<1>(bqe) == query ) {
       return queryID;
     }
   }
+
+  for (const auto& e: this->brokerOneTimeQueries) {
+    std::string queryID = e.first;
+    BrokerOneTimeQueryEntry bqe = e.second;
+    if ( std::get<1>(bqe) == query ) {
+        return queryID;
+  }
+}
   return "";
 }
+
 
 Status BrokerManager::removeBrokerQueryEntry(const std::string& query) {
   std::string queryID = this->findIDForQuery(query);
@@ -157,7 +183,10 @@ Status BrokerManager::removeBrokerQueryEntry(const std::string& query) {
   LOG(INFO) << "Deleting query '" << query << "' with queryID '" << queryID << "'";
   this->eventTopics.erase(queryID);
   this->eventNames.erase(queryID);
-  this->brokerQueries.erase(queryID);
+  if ( this->brokerScheduleQueries.find(queryID) != this->brokerScheduleQueries.end() )
+    this->brokerScheduleQueries.erase(queryID);
+  else if ( this->brokerOneTimeQueries.find(queryID) != this->brokerOneTimeQueries.end() )
+    this->brokerOneTimeQueries.erase(queryID);
 
   return Status(0,"OK");
 }
@@ -168,7 +197,7 @@ std::string BrokerManager::getQueryConfigString() {
 
   // Format each query
   std::vector<std::string> scheduleQ;
-  for(const auto& bq: brokerQueries) {
+  for(const auto& bq: brokerScheduleQueries) {
     auto i = bq.second;
     std::stringstream ss;
     ss << "\"" << std::get<0>(i) <<"\": {\"query\": \"" << std::get<1>(i) << ";\", \"interval\": " << std::get<2>(i) << ", \"added\": " << std::get<3>(i) << ", \"removed\": " << std::get<4>(i) << ", \"snapshot\": " << std::get<5>(i) << "}";
@@ -206,7 +235,7 @@ Status BrokerManager::logQueryLogItemToBro(const QueryLogItem& qli) {
 
   // Send added
   for (const auto& row: qli.results.added) {
-    this->logQueryLogItemRowToBro(queryID, identifier, row, "added");
+    this->logQueryLogItemRowToBro(queryID, identifier, row, "ADDED");
   }  
 
   // Send removed
@@ -214,7 +243,7 @@ Status BrokerManager::logQueryLogItemToBro(const QueryLogItem& qli) {
 
   // Send snapshot
     for (const auto& row: qli.snapshot_results) {
-        this->logQueryLogItemRowToBro(queryID, identifier, row, "snapshot");
+        this->logQueryLogItemRowToBro(queryID, identifier, row, "SNAPSHOT");
     }
     // TODO: Not Implemented
 
@@ -223,26 +252,25 @@ Status BrokerManager::logQueryLogItemToBro(const QueryLogItem& qli) {
   
 Status BrokerManager::logQueryLogItemRowToBro(const std::string queryID, const std::string identifier, const osquery::Row& row, const std::string& trigger) {
   // Create Event Message
+  std::string uid = this->getNodeID();
   broker::message msg;
 
   // Set Event_Name
-  std::string event_name;
-  if (trigger == "snapshot")
-    event_name = identifier;
-  else if (trigger == "added")
-    event_name = this->eventNames.at(queryID);
-
-  LOG(INFO) << "Creating message for event with name :'" << event_name << "'";
+  std::string event_name = this->eventNames.at(queryID);
   msg.push_back(event_name);
+  LOG(INFO) << "Creating message for event with name :'" << event_name << "'";
 
-  std::string query;
+  // Set uid and trigger
+  msg.push_back(uid);
+  msg.push_back(trigger);
+
   // Get Info about SQL Query and Types
-  if (trigger == "snapshot")
-    query = queryID;
-  else if (trigger == "added") {
-    BrokerQueryEntry bqe = this->brokerQueries.at(queryID);
-    query = std::get<1>(bqe);
-  }
+  std::string query;
+  if (trigger=="SNAPSHOT")
+    query = std::get<1>(this->brokerOneTimeQueries.at(queryID));
+  else if (trigger=="ADDED")
+    query = std::get<1>(this->brokerScheduleQueries.at(queryID));
+
   TableColumns columns;
   Status status = getQueryColumnsExternal(query, columns);
   std::map<std::string, ColumnType> columnTypes;
@@ -294,13 +322,10 @@ Status BrokerManager::logQueryLogItemRowToBro(const std::string queryID, const s
   }
 
   // Create and Send Broker Event Message
-  std::string topic;
-  if (trigger == "snapshot") {
-      // TODO: Make dynamic (set when receiving the request)
-    std::string uid = this->getNodeID();
-    topic = "/osquery/uid/" + uid;
-  } else if (trigger == "added")
-    topic = this->eventTopics.at(queryID);
+  std::string topic = this->eventTopics.at(queryID);
+  if (trigger == "SNAPSHOT") {
+      this->removeBrokerQueryEntry(query);
+  }
 
   if ( this->ep == nullptr )
   {
