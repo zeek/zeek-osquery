@@ -65,14 +65,15 @@ int main(int argc, char* argv[]) {
   broker::init();
   BrokerManager* bm = BrokerManager::getInstance();
   bm->createEndpoint("Bro-osquery Extension");
-  // Listen on default topics (global, groups and node)
-  bm->createMessageQueue("/osquery/all");
-  auto groups = bm->getGroups();
-  for (std::string g: groups) {
-    bm->createMessageQueue("/osquery/group/" + g);
-  }
+  // Retrieve uid and groups
   std::string uid = bm->getNodeID();
-  bm->createMessageQueue("/osquery/uid/" + uid);
+  auto groups = bm->getGroups();
+  // Listen on default topics (global, groups and node)
+  bm->createMessageQueue("/bro/osquery/all");
+  bm->createMessageQueue("/bro/osquery/uid/" + uid);
+  for (std::string g: groups) {
+    bm->createMessageQueue("/bro/osquery/group/" + g);
+  }
   // Connect to Bro
   LOG(INFO) << "Connecting to " << FLAGS_bro_endpoint;
   auto status_broker = bm->peerEndpoint(FLAGS_bro_endpoint, 9999);
@@ -81,9 +82,24 @@ int main(int argc, char* argv[]) {
     runner.requestShutdown(status_broker.getCode());
   }
 
-  // Annouce this endpoint to be a bro-osquery extension
-  broker::message announceMsg = broker::message{"new_osquery_host", uid};
-  bm->getEndpoint()->send("/osquery/announces", announceMsg);
+  // Announce this endpoint to be a bro-osquery extension
+  broker::vector group_list;
+  for (std::string g: groups) {
+    group_list.push_back( g );
+  }
+  QueryData addr_results;
+  auto status_if = osquery::queryExternal("SELECT address from interface_addresses", addr_results);
+  if (!status_if.ok()) {
+    LOG(ERROR) << status_if.getMessage();
+    runner.requestShutdown(status_if.getCode());
+  }
+  broker::vector addr_list;
+  for (auto row: addr_results) {
+    std::string ip = row.at("address");
+    addr_list.push_back( broker::address::from_string(ip).get() );
+  }
+  broker::message announceMsg = broker::message{"host_new", uid, group_list, addr_list};
+  bm->getEndpoint()->send("/bro/osquery/announces", announceMsg);
 
   // Wait for schedule requests
   fd_set fds;
@@ -119,13 +135,13 @@ int main(int argc, char* argv[]) {
           std::string eventName = broker::to_string(msg[0]);
           LOG(INFO) << "Received event '" << eventName << "' on topic '" << topic << "'";
 
-          if ( eventName == "execute_osquery_query" ) {
+          if ( eventName == "host_query" ) {
               // TODO: How should responses to a query look like that has no results?
               //    a) Only sending results as they are available (we might can do this asynchronously via logger)
               //    b) Sending empty results if no result available (we have to actively check/wait for request exec)
               //a)
               std::string response_event = broker::to_string(msg[1]);
-              std::string query = to_string(msg[2]);
+              std::string query = broker::to_string(msg[2]);
 
               // Execute the query
               LOG(INFO) << "Executing one-time query: " << response_event << ": " << query;
@@ -163,16 +179,30 @@ int main(int argc, char* argv[]) {
 
               continue;
 
-          } else if ( eventName == "add_osquery_query" ) {
+          } else if ( eventName == "host_subscribe" ) {
           // New SQL Query Request
-            QueryRequest qr;
-            qr.query = broker::to_string(msg[2]);
-            qr.response_event = broker::to_string(msg[1]);
+            SubscriptionRequest sr;
+            sr.query = broker::to_string(msg[2]);
+            sr.response_event = broker::to_string(msg[1]);
             // The topic where the request was received
-            qr.response_topic = topic; // TODO: or use custom as optionally specified in msg
-            bm->addBrokerQueryEntry(qr);
+            sr.response_topic = topic; // TODO: or use custom as optionally specified in msg
+            std::string update_type = broker::to_string(msg[3]);
+            if (update_type == "ADDED") {
+                sr.added = true; sr.removed = false; }
+            else if (update_type == "REMOVED") {
+                sr.added = false; sr.removed = true; }
+            else if (update_type == "ADDED") {
+                sr.added = true; sr.removed = true; }
+            else {
+                LOG(ERROR) << "Unknown update type: " << update_type;
+                runner.requestShutdown(1);
+            }
 
-          } else if ( eventName == "remove_osquery_query" ) {
+            sr.init_dump = broker::get<bool>(msg[4]);
+
+            bm->addBrokerQueryEntry(sr);
+
+          } else if ( eventName == "host_unsubscribe" ) {
           // SQL Query Cancel
             //TODO: find an UNIQUE identifier (currently the exact sql string)
             std::string query = broker::to_string(msg[1]);

@@ -13,7 +13,7 @@ namespace osquery {
   //ID, query, interval, added, removed, snapshot
   typedef std::tuple<std::string, std::string, int, bool, bool, bool> BrokerQueryEntry;
 
-  struct QueryRequest {
+  struct SubscriptionRequest {
     std::string query; // The requested SQL query
     std::string response_event; // The event name for the response event
     std::string response_topic; // The topic name for the response event
@@ -21,6 +21,7 @@ namespace osquery {
     bool added = true;
     bool removed = false;
     bool snapshot = false;
+    bool init_dump = false;
   };
 
 
@@ -58,9 +59,9 @@ class BrokerManager {
     osquery::Status peerEndpoint(std::string ip, int port);
 
 
-    osquery::Status addBrokerQueryEntry(const QueryRequest& qr);
+    osquery::Status addBrokerQueryEntry(const SubscriptionRequest& qr);
 
-    osquery::Status addBrokerQueryEntry(const std::string& queryID, const QueryRequest& qr);
+    osquery::Status addBrokerQueryEntry(const std::string& queryID, const SubscriptionRequest& qr);
 
     std::string findIDForQuery(const std::string& query);
 

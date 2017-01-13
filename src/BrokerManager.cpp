@@ -109,12 +109,12 @@ Status BrokerManager::peerEndpoint(std::string ip, int port) {
 //////////////// Schedule/Query Handling ////////////////
 /////////////////////////////////////////////////////////
 
-Status BrokerManager::addBrokerQueryEntry(const QueryRequest& qr) {
+Status BrokerManager::addBrokerQueryEntry(const SubscriptionRequest& qr) {
   const std::string queryID = std::to_string(this->_nextUID++);
   return addBrokerQueryEntry(queryID, qr);
 }
 
-Status BrokerManager::addBrokerQueryEntry(const std::string& queryID, const QueryRequest& qr) {
+Status BrokerManager::addBrokerQueryEntry(const std::string& queryID, const SubscriptionRequest& qr) {
   std::string query = qr.query;
   std::string response_event = qr.response_event;
   std::string response_topic = qr.response_topic;
