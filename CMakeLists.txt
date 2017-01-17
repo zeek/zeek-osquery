@@ -10,12 +10,12 @@ find_package(Libcaf COMPONENTS core io REQUIRED)
 find_package(Broker REQUIRED)
 
 include_directories(BEFORE ${BROKER_INCLUDE_DIRS})
-include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-include_directories(BEFORE ${CMAKE_BINARY_DIR}/src)
-set(LINK_LIBS ${LINK_LIBS} ${BROKER_LIBRARY} ${LIBCAF_LIBRARIES} /usr/lib/x86_64-linux-gnu/libconfig++.so)
+include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+#include_directories(BEFORE ${CMAKE_BINARY_DIR}/src)
+set(LINK_LIBS ${LINK_LIBS} ${BROKER_LIBRARY} ${LIBCAF_LIBRARIES})
 
 set(PROJECT_SOURCES
-  src/logger/logger.cpp
+  src/logger.cpp
   src/extension.cpp
   src/utils.cpp
   src/BrokerManager.cpp
