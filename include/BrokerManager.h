@@ -40,8 +40,6 @@ class BrokerManager {
         _instance = new BrokerManager ();
       return _instance;
     }
- 
-    void printThis(std::string s);
     
     std::string getNodeID();
     
@@ -75,7 +73,7 @@ class BrokerManager {
 
     Status logQueryLogItemToBro(const QueryLogItem& qli);
 
-    Status logQueryLogItemRowToBro(const std::string queryID, const std::string identifier, const osquery::Row& row, const std::string& trigger);
+    Status sendEvent(const std::string& topic, const broker::message& msg);
 
   private:
     // The singleton object

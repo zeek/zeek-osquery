@@ -42,3 +42,16 @@ Therefore, this branch is development bro-osquery with characteristics as follow
      * Several system libraries in `/usr/local/osquery`
      
 Once the build process is stable, we will release an install script.
+
+## Deployment ##
+The config file (i.e. `/etc/osquery/osquery.conf`) was extended by another key named `bro`. The setting `bro_endpoint` must be set such that:
+
+    {
+    // Configure the daemon below:
+      "bro": {
+        // Address of bro
+        "bro_endpoint": "172.17.0.2:9999"
+      },
+    
+      "options": {
+        ...

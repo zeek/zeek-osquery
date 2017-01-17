@@ -7,6 +7,7 @@
 
 #include <BrokerManager.h>
 #include <iostream>
+#include <sstream>
 #include <list>
 #include <stdlib.h>     /* srand, rand */
 #include <time.h>
@@ -20,24 +21,43 @@ BrokerManager* BrokerManager::_instance = nullptr;
 BrokerManager::BrokerManager() {
 }
 
-void BrokerManager::printThis(std::string s) {
-  LOG(ERROR) << "Hello from bm (this=" << &(*this) << "; PID=" << ::getpid() << "; this->ep=" << this->ep << "): " << s;
-
-}
-
 std::string BrokerManager::getNodeID() {
-  //TODO: read from config or default
+   if (this->nodeID != "") {
+       return this->nodeID;
+   }
 
-  // Generate Random ID
-  if ( this->nodeID == "" ) {
-    const char alphanum[] =
-      "0123456789"
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    std::stringstream ss;
-    for (int i = 0; i < 64; ++i) 
-      ss << alphanum[rand() % (sizeof(alphanum) - 1)];
-    this->nodeID = ss.str();
+  // Try to derive from all MACs
+  QueryData mac_results;
+  auto status_if = osquery::queryExternal("SELECT mac from interface_details", mac_results);
+  if (!status_if.ok()) {
+      LOG(ERROR) << status_if.getMessage();
+      LOG(ERROR) << "Generating random temporary ID instead";
+      // Generate Random ID
+      if ( this->nodeID == "" ) {
+          const char alphanum[] =
+                  "0123456789"
+                          "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+          std::stringstream ss;
+          for (int i = 0; i < 64; ++i)
+              ss << alphanum[rand() % (sizeof(alphanum) - 1)];
+          this->nodeID = ss.str();
+      }
+  } else {
+      // Hash all MACs
+      std::hash <std::string> hash_fn;
+      std::stringstream macs;
+      for (const auto &row: mac_results) {
+          macs << row.at("mac");
+      }
+      size_t str_hash = hash_fn(macs.str());
+
+      // Convert to Hex String
+      std::stringstream hs;
+      hs << std::hex << str_hash;
+      this->nodeID = hs.str();
   }
+
+  LOG(INFO) << "New Node ID: " << this->nodeID;
   return this->nodeID;
 }
 
@@ -192,9 +212,6 @@ Status BrokerManager::removeBrokerQueryEntry(const std::string& query) {
 }
 
 std::string BrokerManager::getQueryConfigString() {
-  std::string pre = "{\"schedule\": {\"bro\": {\"query\": \"";
-  std::string post = ";\", \"interval\": 10} } } ";
-
   // Format each query
   std::vector<std::string> scheduleQ;
   for(const auto& bq: brokerScheduleQueries) {
@@ -224,111 +241,127 @@ std::string BrokerManager::getQueryConfigString() {
 
 
 Status BrokerManager::logQueryLogItemToBro(const QueryLogItem& qli) {
-
-
   // Attributes from QueryLogItem
   std::string queryID = qli.name; // The QueryID
-  std::string identifier = qli.identifier; // The HostID
-  size_t time = qli.time;
-  std::string calendar_time = qli.calendar_time;
-  std::map<std::string, std::string> decorations = qli.decorations;
+//  std::string identifier = qli.identifier; // The HostID
+//  size_t time = qli.time;
+//  std::string calendar_time = qli.calendar_time;
+//  std::map<std::string, std::string> decorations = qli.decorations;me;
 
-  // Send added
+
+  // Is this schedule or one-time?
+  std::string query;
+  std::string qType;
+  if (this->brokerScheduleQueries.find(queryID) != this->brokerScheduleQueries.end()) {
+    qType = "SCHEDULE";
+    query = std::get<1>(this->brokerScheduleQueries.at(queryID));
+  } else if (this->brokerOneTimeQueries.find(queryID) != this->brokerOneTimeQueries.end()) {
+    qType = "ONETIME";
+    query = std::get<1>(this->brokerOneTimeQueries.at(queryID));
+  } else {
+      LOG(ERROR) << "QueryID not in brokerQueries";
+      return Status(1, "Unknown QueryID");
+  }
+
+  // Rows to be reported
+  std::vector<std::tuple<osquery::Row,std::string>> rows;
   for (const auto& row: qli.results.added) {
-    this->logQueryLogItemRowToBro(queryID, identifier, row, "ADDED");
-  }  
-
-  // Send removed
-  // TODO: Not Implemented
-
-  // Send snapshot
-    for (const auto& row: qli.snapshot_results) {
-        this->logQueryLogItemRowToBro(queryID, identifier, row, "SNAPSHOT");
-    }
-    // TODO: Not Implemented
-
-  return Status(0, "OK");
-}
-  
-Status BrokerManager::logQueryLogItemRowToBro(const std::string queryID, const std::string identifier, const osquery::Row& row, const std::string& trigger) {
-  // Create Event Message
-  std::string uid = this->getNodeID();
-  broker::message msg;
-
-  // Set Event_Name
-  std::string event_name = this->eventNames.at(queryID);
-  msg.push_back(event_name);
-  LOG(INFO) << "Creating message for event with name :'" << event_name << "'";
-
-  // Set uid and trigger
-  msg.push_back(uid);
-  msg.push_back(trigger);
+      rows.emplace_back(row, "ADDED");
+  }
+  for (const auto& row: qli.results.added) {
+      rows.emplace_back(row, "REMOVED");
+  }
+  for (const auto& row: qli.snapshot_results) {
+      rows.emplace_back(row, "SNAPSHOT");
+  }
 
   // Get Info about SQL Query and Types
-  std::string query;
-  if (trigger=="SNAPSHOT")
-    query = std::get<1>(this->brokerOneTimeQueries.at(queryID));
-  else if (trigger=="ADDED")
-    query = std::get<1>(this->brokerScheduleQueries.at(queryID));
-
   TableColumns columns;
   Status status = getQueryColumnsExternal(query, columns);
   std::map<std::string, ColumnType> columnTypes;
   for (std::tuple<std::string, ColumnType, ColumnOptions> t: columns) {
-    columnTypes[std::get<0>(t)] = std::get<1>(t);
+      std::string columnName = std::get<0>(t);
+      ColumnType columnType = std::get<1>(t);
+//      ColumnOptions columnOptions = std::get<2>(t);
+      columnTypes[columnName] = columnType;
+    LOG(INFO) << "Column named '" << columnName << "' is of type '" << kColumnTypeNames.at(columnType) << "'";
   }
 
-  // Set Params
-  for (const auto& col: row) {
-    std::string colName = col.first;
-    std::string value = col.second;
-    LOG(INFO) << "Column named '" << colName << "' is of type '" << kColumnTypeNames.at(columnTypes.at(colName)) << "'";
-    switch ( columnTypes.at(colName) ) {
-      case ColumnType::UNKNOWN_TYPE : {
-        LOG(ERROR) << "Sending unknown column type as string";
-        msg.push_back( value );
-        break;
-      }
-      case ColumnType::TEXT_TYPE : {
-        msg.push_back( AS_LITERAL(TEXT_LITERAL, value) );
-        break;
-      }
-      case ColumnType::INTEGER_TYPE : {
-        msg.push_back( AS_LITERAL(INTEGER_LITERAL, value) );
-        break;
-      }
-      case ColumnType::BIGINT_TYPE : {
-        msg.push_back( AS_LITERAL(BIGINT_LITERAL, value) );
-        break;
-      }
-      case ColumnType::UNSIGNED_BIGINT_TYPE : {
-        msg.push_back( AS_LITERAL(UNSIGNED_BIGINT_LITERAL, value) );
-        break;
-      }
-      case ColumnType::DOUBLE_TYPE : {
-        msg.push_back( AS_LITERAL(DOUBLE_LITERAL, value) );
-        break;
-      }
-      case ColumnType::BLOB_TYPE : {
-        LOG(ERROR) << "Sending blob column type as string";
-        msg.push_back( value );
-        break;
-      }
-      default : {
-        LOG(ERROR) << "Unkown ColumnType!";
-        continue;
-      }
-    }
-  }
-
-  // Create and Send Broker Event Message
+  // Common message fields
+  std::string uid = this->getNodeID();
   std::string topic = this->eventTopics.at(queryID);
-  if (trigger == "SNAPSHOT") {
-      this->removeBrokerQueryEntry(query);
+  std::string event_name = this->eventNames.at(queryID);
+  LOG(INFO) << "Creating "<< rows.size() << " messages for events with name :'" << event_name << "'";
+
+
+  // Create message for each row
+  for (const auto& element: rows) {
+      // Get row and trigger
+      osquery::Row row = std::get<0>(element);
+      std::string trigger = std::get<1>(element);
+
+      // Set event name, uid and trigger
+      broker::message msg;
+      msg.push_back(event_name);
+      msg.push_back(uid);
+      msg.push_back(trigger);
+
+      // Format each column
+      for (const auto& col: row) {
+          std::string colName = col.first;
+          std::string value = col.second;
+          switch ( columnTypes.at(colName) ) {
+              case ColumnType::UNKNOWN_TYPE : {
+                  LOG(ERROR) << "Sending unknown column type as string";
+                  msg.push_back( value );
+                  break;
+              }
+              case ColumnType::TEXT_TYPE : {
+                  msg.push_back( AS_LITERAL(TEXT_LITERAL, value) );
+                  break;
+              }
+              case ColumnType::INTEGER_TYPE : {
+                  msg.push_back( AS_LITERAL(INTEGER_LITERAL, value) );
+                  break;
+              }
+              case ColumnType::BIGINT_TYPE : {
+                  msg.push_back( AS_LITERAL(BIGINT_LITERAL, value) );
+                  break;
+              }
+              case ColumnType::UNSIGNED_BIGINT_TYPE : {
+                  msg.push_back( AS_LITERAL(UNSIGNED_BIGINT_LITERAL, value) );
+                  break;
+              }
+              case ColumnType::DOUBLE_TYPE : {
+                  msg.push_back( AS_LITERAL(DOUBLE_LITERAL, value) );
+                  break;
+              }
+              case ColumnType::BLOB_TYPE : {
+                  LOG(ERROR) << "Sending blob column type as string";
+                  msg.push_back( value );
+                  break;
+              }
+              default : {
+                  LOG(ERROR) << "Unkown ColumnType!";
+                  continue;
+              }
+          }
+      }
+
+      // Send event message
+      this->sendEvent(topic, msg);
   }
 
-  if ( this->ep == nullptr )
-  {
+  // Delete one-time query information
+  if (qType == "ONETIME") {
+    this->removeBrokerQueryEntry(query);
+  }
+
+  return Status(0, "OK");
+}
+  
+Status BrokerManager::sendEvent(const std::string& topic, const broker::message& msg) {
+  if ( this->ep == nullptr ) {
     LOG(ERROR) << "Endpoint not set yet!";
     return Status(1, "Endpoint not set");
   } else {

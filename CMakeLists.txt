@@ -15,10 +15,11 @@ include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set(LINK_LIBS ${LINK_LIBS} ${BROKER_LIBRARY} ${LIBCAF_LIBRARIES})
 
 set(PROJECT_SOURCES
-  src/logger.cpp
+#  src/logger.cpp
   src/extension.cpp
   src/utils.cpp
   src/BrokerManager.cpp
+  src/plugins.cpp
 #  src/Parser.cpp
 )
 
