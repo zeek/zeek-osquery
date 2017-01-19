@@ -1,6 +1,5 @@
 @load base/frameworks/broker
 
-#const broker_port: port = 9999/tcp &redef;
 redef exit_only_after_terminate = T;
 redef Broker::endpoint_name = "Bro";
 
@@ -41,18 +40,19 @@ event host_unixTime(client_id: string, utype: string,
 
         Log::write(LOG, info);
 
+	local topics: vector of string = {osquery::HostBroadcastTopic};
 	if ( c == 2 ) 
 		{
 		# Let's execute a one-time query
 		local ev_onetime = [$ev=host_osVersion,$query="SELECT name, major FROM os_version;"];
-		osquery::execute_query(ev_onetime);
+		osquery::execute_query(ev_onetime, topics);
 		}
 
 	if (c == 4 ) 
 		{
 		# We dont want to receive any more unixTimes
 		local ev_unsub = [$ev=host_unixTime,$query="SELECT unix_time FROM time"];
-		osquery::unsubscribe(ev_unsub);
+		osquery::unsubscribe(ev_unsub, topics);
 		}
 
 	c += 1;
@@ -65,6 +65,6 @@ event bro_init()
         Log::create_stream(LOG, [$columns=Info, $path="osq-example-framework"]);
 
         local ev = [$ev=host_unixTime,$query="SELECT unix_time FROM time"];
-	print "example_framework: Scheduling query";
-        osquery::subscribe(ev);
+	local topics: vector of string = {osquery::HostBroadcastTopic};
+        osquery::subscribe(ev, topics);
         }

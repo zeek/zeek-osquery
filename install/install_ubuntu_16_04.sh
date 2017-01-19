@@ -167,7 +167,7 @@ function patchOsqueryForExtensions() {
   echo "index 40a0687..0dcd6b6 100644" >> patchfile3
   echo "--- a/CMakeLists.txt" >> patchfile3
   echo "+++ b/CMakeLists.txt" >> patchfile3
-  echo "@@ -477,7 +477,7 @@ add_subdirectory(\"\${CMAKE_SOURCE_DIR}/third-party/gmock-1.7.0\")" >> patchfile3
+  echo "@@ -485,7 +485,7 @@ add_subdirectory(\"\${CMAKE_SOURCE_DIR}/third-party/gmock-1.7.0\")" >> patchfile3
   echo " " >> patchfile3
   echo " add_subdirectory(osquery)" >> patchfile3
   echo " add_subdirectory(tools/tests)" >> patchfile3
@@ -189,7 +189,7 @@ function patchOsqueryForExtensions() {
   echo "index a2e5608..19116b5 100644" >> patchfile4 
   echo "--- a/osquery/CMakeLists.txt" >> patchfile4 
   echo "+++ b/osquery/CMakeLists.txt" >> patchfile4 
-  echo "@@ -374,4 +374,6 @@ if(NOT DEFINED ENV{SKIP_TESTS})" >> patchfile4 
+  echo "@@ -375,4 +375,6 @@ if(NOT DEFINED ENV{SKIP_TESTS})" >> patchfile4 
   echo " " >> patchfile4 
   echo "   # Build the example extension module with the SDK." >> patchfile4 
   echo "   ADD_OSQUERY_MODULE(modexample examples/example_module.cpp)" >> patchfile4 

@@ -20,11 +20,10 @@ namespace osquery {
         std::string query; // The requested SQL query
         std::string response_event; // The event name for the response event
         std::string response_topic; // The topic name for the response event
-        int interval = 10;
+        uint64_t interval = 10;
         bool added = true;
         bool removed = false;
         bool snapshot = false;
-        bool init_dump = false;
     };
 
 class BrokerManager {

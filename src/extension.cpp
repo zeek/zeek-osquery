@@ -51,12 +51,13 @@ int main(int argc, char *argv[]) {
     PluginRequest &config_filesystem = response.front();
     osquery::Config::getInstance().update(config_filesystem);
 
-    // Retrieve BrokerEndpoint Address from Config Options:
+    // Retrieve Bro from Config:
     auto optionParser = osquery::Config::getInstance().getParser("bro").get();
     const auto &options = optionParser->getData().get_child("bro");
     std::string bro_ip = "";
     int bro_port = -1;
     for (const auto &option: options) {
+        // BrokerEndpoint Address
         if (option.first == "bro_endpoint") {
             std::string bro_addr = options.get<std::string>(option.first);
             if ( ! bro_addr.empty() and bro_addr.find(":") != std::string::npos) {
@@ -64,12 +65,20 @@ int main(int argc, char *argv[]) {
                 bro_ip = bro_addr.substr(0, pos);
                 bro_port = atoi( bro_addr.substr(++pos, bro_addr.length()).c_str() );
             }
-            break;
+        }
+        // Groups
+        if (option.first == "uid") {
+            // TODO: Parse and set uid
+        }
+        // Groups
+        if (option.first == "groups") {
+            // TODO: Parse and set groups
         }
     }
+    // Check parsed Bro Options
+    // BrokerEndpoint Address
     if (! bro_ip.empty() and bro_port != -1) {
-    //if (true) {
-        LOG(INFO) << "Retrieved Bro IP '" << bro_ip << "' and port '" << bro_port << "'";
+        LOG(INFO) << "Parsed Bro IP '" << bro_ip << "' and port '" << bro_port << "'";
     } else {
         LOG(ERROR) << "Specify 'bro_endpoint' in the format '<ip:port>' under 'bro' in the osquery config file";
         runner.requestShutdown(status_ext.getCode());
@@ -97,10 +106,12 @@ int main(int argc, char *argv[]) {
     }
 
     // Announce this endpoint to be a bro-osquery extension
+    // Groups
     broker::vector group_list;
     for (std::string g: groups) {
         group_list.push_back(g);
     }
+    // IPs
     QueryData addr_results;
     auto status_if = osquery::queryExternal("SELECT address from interface_addresses", addr_results);
     if (!status_if.ok()) {
@@ -145,7 +156,11 @@ int main(int argc, char *argv[]) {
                 // Process each message on this socket
                 for (auto &msg: queue->want_pop()) {
                     // Check Event Type
-                    std::string eventName = broker::to_string(msg[0]);
+                    if ( msg.size() < 1 or ! broker::is<std::string>(msg[0]) ) {
+                        LOG(WARNING) << "No or invalid event name";
+                        continue;
+                    }
+                    std::string eventName = *broker::get<std::string>(msg[0]);
                     LOG(INFO) << "Received event '" << eventName << "' on topic '" << topic << "'";
 
                     if (eventName == "osquery::host_query") {
@@ -155,7 +170,7 @@ int main(int argc, char *argv[]) {
                         //    b) Sending empty results if no result available (we have to actively check/wait for request exec)
                         //a)
                         SubscriptionRequest sr;
-                        createSubscriptionRequest(msg, topic, sr);
+                        createSubscriptionRequest("QUERY", msg, topic, sr);
                         std::string newQID = bm->addBrokerOneTimeQueryEntry(sr);
                         if (newQID == "-1") {
                             LOG(ERROR) << "Unable to add Broker Query Entry";
@@ -176,20 +191,6 @@ int main(int argc, char *argv[]) {
                             bm->removeBrokerQueryEntry(sr.query);
                             continue;
                         }
-                        /*
-                        std::string response_event = broker::to_string(msg[1]);
-                        std::string query = broker::to_string(msg[2]);
-
-
-                        // Execute the query
-                        LOG(INFO) << "Executing one-time query: " << response_event << ": " << query;
-                        QueryData results;
-                        auto status_query = osquery::queryExternal(query, results);
-                        if (!status_query.ok()) {
-                            LOG(ERROR) << status_query.getMessage();
-                            runner.requestShutdown(status_query.getCode());
-                        }
-                         */
 
                         // Assemble a response item (as snapshot)
                         QueryLogItem item;
@@ -199,14 +200,11 @@ int main(int argc, char *argv[]) {
                         item.calendar_time = osquery::getAsciiTime();
                         item.snapshot_results = results;
 
-                        //printQueryLogItem(item);
-
                         // Send snapshot to the logger
                         std::string registry_name = "logger";
                         std::string item_name = "bro";
                         std::string json;
                         serializeQueryLogItemJSON(item, json);
-                        printQueryLogItemJSON(json);
                         PluginRequest request = {{"snapshot", json},
                                                  {"category", "event"}};
                         auto status_call = osquery::Registry::call(registry_name, item_name, request);
@@ -222,14 +220,13 @@ int main(int argc, char *argv[]) {
                     } else if (eventName == "osquery::host_subscribe") {
                         // New SQL Query Request
                         SubscriptionRequest sr;
-                        createSubscriptionRequest(msg, topic, sr);
-
+                        createSubscriptionRequest("SUBSCRIBE", msg, topic, sr);
                         bm->addBrokerScheduleQueryEntry(sr);
 
                     } else if (eventName == "osquery::host_unsubscribe") {
                         // SQL Query Cancel
                         SubscriptionRequest sr;
-                        createSubscriptionRequest(msg, topic, sr);
+                        createSubscriptionRequest("UNSUBSCRIBE", msg, topic, sr);
                         //TODO: find an UNIQUE identifier (currently the exact sql string)
                         std::string query = sr.query;
 
@@ -246,10 +243,7 @@ int main(int argc, char *argv[]) {
                     std::map <std::string, std::string> config_schedule;
                     config_schedule["bro"] = bm->getQueryConfigString();
                     LOG(INFO) << "Applying new schedule: " << config_schedule["bro"];
-
-                    std::map <std::string, std::string> config{config_filesystem};
-                    config["bro"] = config_schedule["bro"];
-                    osquery::Config::getInstance().update(config);
+                    osquery::Config::getInstance().update(config_schedule);
                 }
             }
         }

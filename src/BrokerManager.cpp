@@ -200,13 +200,16 @@ Status BrokerManager::removeBrokerQueryEntry(const std::string& query) {
   }
 
   // Delete query info
-  LOG(INFO) << "Deleting query '" << query << "' with queryID '" << queryID << "'";
   this->eventTopics.erase(queryID);
   this->eventNames.erase(queryID);
-  if ( this->brokerScheduleQueries.find(queryID) != this->brokerScheduleQueries.end() )
-    this->brokerScheduleQueries.erase(queryID);
-  else if ( this->brokerOneTimeQueries.find(queryID) != this->brokerOneTimeQueries.end() )
-    this->brokerOneTimeQueries.erase(queryID);
+  if ( this->brokerScheduleQueries.find(queryID) != this->brokerScheduleQueries.end() ) {
+      LOG(INFO) << "Deleting schedule query '" << query << "' with queryID '" << queryID << "'";
+      this->brokerScheduleQueries.erase(queryID);
+  }
+  else if ( this->brokerOneTimeQueries.find(queryID) != this->brokerOneTimeQueries.end() ) {
+      LOG(INFO) << "Deleting onetime query '" << query << "' with queryID '" << queryID << "'";
+      this->brokerOneTimeQueries.erase(queryID);
+  }
 
   return Status(0,"OK");
 }
@@ -284,7 +287,7 @@ Status BrokerManager::logQueryLogItemToBro(const QueryLogItem& qli) {
       ColumnType columnType = std::get<1>(t);
 //      ColumnOptions columnOptions = std::get<2>(t);
       columnTypes[columnName] = columnType;
-    LOG(INFO) << "Column named '" << columnName << "' is of type '" << kColumnTypeNames.at(columnType) << "'";
+//    LOG(INFO) << "Column named '" << columnName << "' is of type '" << kColumnTypeNames.at(columnType) << "'";
   }
 
   // Common message fields
@@ -365,7 +368,7 @@ Status BrokerManager::sendEvent(const std::string& topic, const broker::message&
     LOG(ERROR) << "Endpoint not set yet!";
     return Status(1, "Endpoint not set");
   } else {
-    LOG(INFO) << "Sending Message: " << broker::to_string(msg);
+    LOG(INFO) << "Sending Message: " << broker::to_string(msg) << " to " << topic;
     this->ep->send(topic, msg);
   }
 

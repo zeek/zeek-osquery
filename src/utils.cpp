@@ -1,5 +1,6 @@
 #include <osquery/sdk.h>
 #include <osquery/system.h>
+//#include <osquery/flags.h>
 
 #include <utils.h>
 
@@ -12,13 +13,61 @@
 
 namespace osquery {
 
-    Status createSubscriptionRequest(const broker::message& msg, std::string incoming_topic, SubscriptionRequest& sr) {
+    Status createSubscriptionRequest(const std::string& rType, const broker::message& msg,
+                                     const std::string& incoming_topic, SubscriptionRequest& sr) {
 
-        sr.query = broker::to_string(msg[2]);
-        sr.response_event = broker::to_string(msg[1]);
-        // The topic where the request was received
-        sr.response_topic = incoming_topic; // TODO: or use custom as optionally specified in msg
-        std::string update_type = broker::to_string(msg[3]);
+        //Check number of fields
+        unsigned long numFields;
+        if ( rType == "QUERY" )
+            numFields = 5;
+        else if ( rType == "SUBSCRIBE" )
+            numFields = 6;
+        else if ( rType == "UNSUBSCRIBE" )
+            numFields = 6;
+        else {
+            LOG(WARNING) << "Unknown Request Type: '" << rType << "'";
+            return Status(1, "Failed to create Subscription Request");
+        }
+
+        if ( msg.size()!= numFields) {
+            LOG(WARNING) << "Invalid number of fields for " << rType << " "
+                    "message '" << broker::to_string(msg[0]) << ""
+                    "': " << msg.size() << " (expected " << numFields << ")";
+            return Status(1, "Failed to create Subscription Request");
+        }
+
+        // Query String
+        if ( broker::is<std::string>(msg[1]) )
+            sr.query = *broker::get<std::string>(msg[2]);
+        else {
+            LOG(WARNING) << "Unexpected data type";
+            return Status(1, "Failed to create Subscription Request");
+        }
+
+        // Response Event Name
+        if ( broker::is<std::string>(msg[1]) )
+            sr.response_event = *broker::get<std::string>(msg[1]);
+        else {
+            LOG(WARNING) << "Unexpected data type";
+            return Status(1, "Failed to create Subscription Request");
+        }
+
+        // Response Topic
+        if( broker::to_string(msg[3]).empty() ) {
+            sr.response_topic = incoming_topic;
+            LOG(WARNING) << "No response topic given for event '" << sr.response_event << "'. Reporting back to "
+                    "incoming topic '" << incoming_topic << "'";
+        } else {
+            if ( broker::is<std::string>(msg[3]) )
+                sr.response_topic = *broker::get<std::string>(msg[3]);
+            else {
+                LOG(WARNING) << "Unexpected data type";
+                return Status(1, "Failed to create Subscription Request");
+            }
+        }
+
+        // Update Type
+        std::string update_type = broker::to_string(msg[4]);
         if (update_type == "ADDED") {
             sr.added = true; sr.removed = false; sr.snapshot = false;
         } else if (update_type == "REMOVED") {
@@ -32,8 +81,25 @@ namespace osquery {
             return Status(1, "Failed to create Subscription Request");
         }
 
-        if (sr.added or sr.removed)
-            sr.init_dump = broker::get<bool>(msg[4]);
+        // If one-time query
+        if ( rType == "QUERY" ) {
+            if (sr.added or sr.removed or !sr.snapshot) {
+                LOG(WARNING) << "Only possible to query SNAPSHOT for one-time queries";
+            }
+            return Status(0, "OK");
+        }
+        // SUBSCRIBE or UNSUBSCRIBE
+        if ( sr.snapshot ) {
+            LOG(WARNING) << "Only possible to query ADD and/or REMOVE for schedule queries";
+        }
+
+        // Interval
+        if ( broker::is<uint64_t>(msg[5]) )
+            sr.interval = *broker::get<uint64_t>(msg[5]);
+        else {
+            LOG(WARNING) << "Unexpected data type";
+            return Status(1, "Failed to create Subscription Request");
+        }
 
         return Status(0,"OK");
     }
