@@ -39,8 +39,26 @@ class BrokerManager {
         _instance = new BrokerManager ();
       return _instance;
     }
+
+    // Topic Prefix
+    const std::string TOPIC_PREFIX = "/bro/osquery/";
+    const std::string TOPIC_ALL = this->TOPIC_PREFIX + "all";
+    const std::string TOPIC_ANNOUNCE = this->TOPIC_PREFIX + "announce";
+    const std::string TOPIC_PRE_INDIVIDUALS = this->TOPIC_PREFIX + "uid/";
+    const std::string TOPIC_PRE_GROUPS = this->TOPIC_PREFIX + "group/";
+    const std::string TOPIC_PRE_CUSTOMS = this->TOPIC_PREFIX + "custom/";
+
+    // Event messages
+    const std::string EVENT_HOST_NEW = "osquery::host_new";
+    const std::string EVENT_HOST_QUERY =  "osquery::host_query";
+    const std::string EVENT_HOST_SUBSCRIBE =  "osquery::host_subscribe";
+    const std::string EVENT_HOST_UNSUBSCRIBE =  "osquery::host_unsubscribe";
+
+    osquery::Status setNodeID(const std::string& uid);
     
     std::string getNodeID();
+
+    osquery::Status addGroup(const std::string& group);
     
     std::vector<std::string> getGroups();
 
@@ -77,8 +95,11 @@ class BrokerManager {
   private:
     // The singleton object
     static BrokerManager* _instance;
+
     // The ID identifying the node (private channel)
     std::string nodeID = "";
+    // The groups of the node
+    std::vector<std::string> groups;
     // The Broker Endpoint
     broker::endpoint* ep = nullptr; // delete afterwards
 

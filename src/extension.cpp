@@ -38,6 +38,7 @@ int main(int argc, char *argv[]) {
     signal(SIGINT, signalHandler);
 
     // Setup OSquery Extension
+    LOG(INFO) << "Starting osquery extention: bro-osquery";
     Initializer runner(argc, argv, ToolType::EXTENSION);
     auto status_ext = startExtension("bro-osquery", "0.0.1");
     if (!status_ext.ok()) {
@@ -45,86 +46,50 @@ int main(int argc, char *argv[]) {
         runner.requestShutdown(status_ext.getCode());
     }
 
-    // Dirty Hack: We have to retrieve and set the config ourselves before accessing options
-    PluginResponse response;
-    auto status = Registry::call("config", {{"action", "genConfig"}}, response);
-    PluginRequest &config_filesystem = response.front();
-    osquery::Config::getInstance().update(config_filesystem);
-
-    // Retrieve Bro from Config:
-    auto optionParser = osquery::Config::getInstance().getParser("bro").get();
-    const auto &options = optionParser->getData().get_child("bro");
-    std::string bro_ip = "";
-    int bro_port = -1;
-    for (const auto &option: options) {
-        // BrokerEndpoint Address
-        if (option.first == "bro_endpoint") {
-            std::string bro_addr = options.get<std::string>(option.first);
-            if ( ! bro_addr.empty() and bro_addr.find(":") != std::string::npos) {
-                auto pos = bro_addr.find(":");
-                bro_ip = bro_addr.substr(0, pos);
-                bro_port = atoi( bro_addr.substr(++pos, bro_addr.length()).c_str() );
-            }
-        }
-        // Groups
-        if (option.first == "uid") {
-            // TODO: Parse and set uid
-        }
-        // Groups
-        if (option.first == "groups") {
-            // TODO: Parse and set groups
-        }
+    // Parse the config for Bro options
+    LOG(INFO) << "Parsing Bro configuration";
+    BroConfigParser bro_parser;
+    auto status_options = bro_parser.parseBroOptions();
+    if (!status_options.ok()) {
+        LOG(ERROR) << status_options.getMessage();
+        runner.requestShutdown(status_options.getCode());
     }
-    // Check parsed Bro Options
-    // BrokerEndpoint Address
-    if (! bro_ip.empty() and bro_port != -1) {
-        LOG(INFO) << "Parsed Bro IP '" << bro_ip << "' and port '" << bro_port << "'";
-    } else {
-        LOG(ERROR) << "Specify 'bro_endpoint' in the format '<ip:port>' under 'bro' in the osquery config file";
-        runner.requestShutdown(status_ext.getCode());
-    }
+    // UID + Groups (parsed options)
+    std::string bro_uid = bro_parser.getUID();
+    std::vector<std::string> bro_groups;
+    bro_parser.getGroups(bro_groups);
 
     // Setup Broker Endpoint
+    LOG(INFO) << "Setup Broker Manager";
     broker::init();
     BrokerManager *bm = BrokerManager::getInstance();
-    bm->createEndpoint("Bro-osquery Extension");
-    // Retrieve uid and groups
+    // UID
+    if ( ! bro_uid.empty() )
+        bm->setNodeID( bro_uid );
     std::string uid = bm->getNodeID();
-    auto groups = bm->getGroups();
-    // Listen on default topics (global, groups and node)
-    bm->createMessageQueue("/bro/osquery/all");
-    bm->createMessageQueue("/bro/osquery/uid/" + uid);
-    for (std::string g: groups) {
-        bm->createMessageQueue("/bro/osquery/group/" + g);
+    // Subscribe to all and individual topic
+    bm->createEndpoint(uid);
+    bm->createMessageQueue(bm->TOPIC_ALL);
+    bm->createMessageQueue(bm->TOPIC_PRE_INDIVIDUALS + uid);
+    // Subscribe to group topics
+    for (std::string g: bro_groups) {
+        bm->addGroup(g);
     }
-    // Connect to Bro
-    LOG(INFO) << "Connecting to '" << bro_ip << ":" << bro_port << "'";
-    auto status_broker = bm->peerEndpoint(bro_ip, bro_port);
+
+    // Connect to Bro and send announce message
+    LOG(INFO) << "Connecting to '" << bro_parser.getBro_IP() << ":" << bro_parser.getBro_Port() << "'";
+    auto status_broker = bm->peerEndpoint(bro_parser.getBro_IP(), bro_parser.getBro_Port());
     if (!status_broker.ok()) {
         LOG(ERROR) << status_broker.getMessage();
         runner.requestShutdown(status_broker.getCode());
     }
+    LOG(INFO) << "Broker connection established. " << "Ready to process, entering main loop.";
 
-    // Announce this endpoint to be a bro-osquery extension
-    // Groups
-    broker::vector group_list;
-    for (std::string g: groups) {
-        group_list.push_back(g);
-    }
-    // IPs
-    QueryData addr_results;
-    auto status_if = osquery::queryExternal("SELECT address from interface_addresses", addr_results);
-    if (!status_if.ok()) {
-        LOG(ERROR) << status_if.getMessage();
-        runner.requestShutdown(status_if.getCode());
-    }
-    broker::vector addr_list;
-    for (auto row: addr_results) {
-        std::string ip = row.at("address");
-        addr_list.push_back(broker::address::from_string(ip).get());
-    }
-    broker::message announceMsg = broker::message{"host_new", uid, group_list, addr_list};
-    bm->getEndpoint()->send("/bro/osquery/announces", announceMsg);
+/*
+ *
+ * MAIN Loop
+ *
+ */
 
     // Wait for schedule requests
     fd_set fds;
@@ -163,12 +128,9 @@ int main(int argc, char *argv[]) {
                     std::string eventName = *broker::get<std::string>(msg[0]);
                     LOG(INFO) << "Received event '" << eventName << "' on topic '" << topic << "'";
 
-                    if (eventName == "osquery::host_query") {
+                    // osquery::host_query
+                    if (eventName == bm->EVENT_HOST_QUERY) {
                         // One-Time Query Execution
-                        // TODO: How should responses to a query look like that has no results?
-                        //    a) Only sending results as they are available (we might can do this asynchronously via logger)
-                        //    b) Sending empty results if no result available (we have to actively check/wait for request exec)
-                        //a)
                         SubscriptionRequest sr;
                         createSubscriptionRequest("QUERY", msg, topic, sr);
                         std::string newQID = bm->addBrokerOneTimeQueryEntry(sr);
@@ -217,13 +179,15 @@ int main(int argc, char *argv[]) {
 
                         continue;
 
-                    } else if (eventName == "osquery::host_subscribe") {
+                    // osquery::host_subscribe
+                    } else if (eventName == bm->EVENT_HOST_SUBSCRIBE) {
                         // New SQL Query Request
                         SubscriptionRequest sr;
                         createSubscriptionRequest("SUBSCRIBE", msg, topic, sr);
                         bm->addBrokerScheduleQueryEntry(sr);
 
-                    } else if (eventName == "osquery::host_unsubscribe") {
+                    // osquery::host_unsubscribe
+                    } else if (eventName == bm->EVENT_HOST_UNSUBSCRIBE) {
                         // SQL Query Cancel
                         SubscriptionRequest sr;
                         createSubscriptionRequest("UNSUBSCRIBE", msg, topic, sr);

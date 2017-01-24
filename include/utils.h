@@ -16,6 +16,7 @@ namespace osquery {
     createSubscriptionRequest(const std::string &rType, const broker::message &msg, const std::string &incoming_topic,
                               SubscriptionRequest &sr);
 
+
 /////////////////////////////////////////////////////////
 //////////////// Print Debug Methods/////////////////////
 /////////////////////////////////////////////////////////
@@ -31,4 +32,6 @@ namespace osquery {
     void printQueryData(const QueryData &data);
 
     void printDecorations(const std::map <std::string, std::string> &deco);
+
+
 }

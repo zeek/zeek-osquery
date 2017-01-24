@@ -50,4 +50,29 @@ namespace osquery {
         Status update(const std::string &source, const ParserConfig &config) override;
     };
 
+    class BroConfigParser {
+    public:
+
+        Status parseBroOptions();
+
+        std::string getBro_IP();
+
+        int getBro_Port();
+
+        std::string getUID();
+
+        void getGroups(std::vector<std::string>& groups);
+
+    private:
+        bool parsed = false;
+        // Parsed Bro Options
+        std::string options_bro_ip = "";
+        int options_bro_port = -1;
+        std::string options_uid = "";
+        std::vector<std::string> options_groups;
+
+    };
+
+
+
 }

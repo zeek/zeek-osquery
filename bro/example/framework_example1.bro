@@ -19,7 +19,7 @@ export {
 global c: int;
 
 event host_osVersion(client_id: string, utype: string,
-                major: int, name: string)
+                name: string, major: int)
         {
                 print fmt("The host '%s' is running '%s' major version '%d'", client_id, name, major);
         }
@@ -40,19 +40,18 @@ event host_unixTime(client_id: string, utype: string,
 
         Log::write(LOG, info);
 
-	local topics: vector of string = {osquery::HostBroadcastTopic};
 	if ( c == 2 ) 
 		{
 		# Let's execute a one-time query
 		local ev_onetime = [$ev=host_osVersion,$query="SELECT name, major FROM os_version;"];
-		osquery::execute_query(ev_onetime, topics);
+		osquery::execute(ev_onetime);
 		}
 
 	if (c == 4 ) 
 		{
 		# We dont want to receive any more unixTimes
 		local ev_unsub = [$ev=host_unixTime,$query="SELECT unix_time FROM time"];
-		osquery::unsubscribe(ev_unsub, topics);
+		osquery::unsubscribe(ev_unsub);
 		}
 
 	c += 1;
@@ -65,6 +64,5 @@ event bro_init()
         Log::create_stream(LOG, [$columns=Info, $path="osq-example-framework"]);
 
         local ev = [$ev=host_unixTime,$query="SELECT unix_time FROM time"];
-	local topics: vector of string = {osquery::HostBroadcastTopic};
-        osquery::subscribe(ev, topics);
+        osquery::subscribe(ev);
         }
