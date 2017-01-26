@@ -23,7 +23,7 @@ export {
         };
 }
 
-event mounts(host: string, utype: string,
+event host_processes(host: string, utype: string,
 		pid: int, name: string, path: string, cmdline: string, cwd: string, root: string, uid: int, gid: int, on_disk: int, 
 		start_time: int, parent: int, pgroup: int)
         {
@@ -56,6 +56,8 @@ event bro_init()
         {
         Log::create_stream(LOG, [$columns=Info, $path="osq-processes"]);
 
-        local ev = [$ev=mounts,$query="SELECT pid,name,path,cmdline,cwd,root,uid,gid,on_disk,start_time,parent,pgroup FROM processes"];
+	Broker::enable();
+
+        local ev = [$ev=host_processes,$query="SELECT pid,name,path,cmdline,cwd,root,uid,gid,on_disk,start_time,parent,pgroup FROM processes"];
         osquery::subscribe(ev);
         }

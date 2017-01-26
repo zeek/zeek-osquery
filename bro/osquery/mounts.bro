@@ -1,6 +1,6 @@
 #! Logs mounts activity.
 
-module osquery::mounts
+module osquery::mounts;
 
 export {
 	redef enum Log::ID += { LOG };
@@ -13,17 +13,17 @@ export {
 		path: string &log;
 		typ: string &log;
 		blocks_size: int &log;
-		blocks_available: int &log;
+		blocks: int &log;
 		flags: string &log;
 	};
 }
 
-event mounts(host: string, utype: string,
+event host_mounts(host: string, utype: string,
 		device: string, device_alias: string, path: string, typ: string,
-		blocks_size: int, block_available: int, flags: string)
+		blocks_size: int, blocks: int, flags: string)
 	{
 	if ( utype != "ADDED" )
-		# Just want to log socket existance.
+		# Just want to log mount existance.
 		return;
 	
 	local info: Info = [
@@ -34,7 +34,7 @@ event mounts(host: string, utype: string,
                       $path = path,
                       $typ = typ,
                       $blocks_size = blocks_size,
-                      $blocks_available = blocks_available,
+                      $blocks = blocks,
                       $flags = flags
 			               ];
 	
@@ -45,6 +45,8 @@ event bro_init()
 	{
 	Log::create_stream(LOG, [$columns=Info, $path="osq-mounts"]);
 	
-	local ev = [$ev=mounts,$query="SELECT device,device_alias,path,type,blocks_size,blocks_available,flags FROM mounts"];
+	Broker::enable();
+
+	local ev = [$ev=host_mounts,$query="SELECT device,device_alias,path,type,blocks_size,blocks,flags FROM mounts"];
 	osquery::subscribe(ev);
 	}

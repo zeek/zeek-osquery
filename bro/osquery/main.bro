@@ -535,12 +535,35 @@ event osquery::host_new(client_id: string, group_list: vector of string, addr_li
 #TODO: Handle peer_name and client_id
 event Broker::incoming_connection_established(peer_name: string)
 	{
-	print "incoming connection";
+	print fmt("Incoming connection from peer: %s", peer_name);
 	log_peer("info", peer_name, "incoming connection established");
 	}
 
-event Broker::connection_incoming_connection_broken(peer_name: string)
+event Broker::incoming_connection_broken(peer_name: string)
 	{
-	local ip = to_addr(peer_name);
+	print fmt("Connection broken to peer: %s", peer_name);
+	log_peer("info", peer_name, "incoming connection broken");
+
+	# Internal client tracking
 	delete hosts[peer_name];
+	delete host_addresses[peer_name];
+
+	local others_groups: set[string];
+	for (i in host_groups)
+		{
+		if ( i != peer_name ) {
+			for ( j in host_groups[i]) {
+				add others_groups[ host_groups[i][j] ] ;
+				}
+			}
+		}
+	for (k in host_groups[peer_name])
+		{
+		local host_g: string = host_groups[peer_name][k];
+		if ( host_g !in others_groups )
+			{
+			delete groups[host_g];
+			}
+		}
+	delete host_groups[peer_name];
 	}

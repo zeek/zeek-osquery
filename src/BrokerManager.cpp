@@ -5,7 +5,8 @@
 #include <broker/endpoint.hh>
 #include <broker/message_queue.hh>
 
-#include <BrokerManager.h>
+#include "BrokerManager.h"
+#include "QueryManager.h"
 #include <iostream>
 #include <sstream>
 #include <list>
@@ -18,6 +19,7 @@ namespace osquery {
     BrokerManager *BrokerManager::_instance = nullptr;
 
     BrokerManager::BrokerManager() {
+        this->qm = QueryManager::getInstance();
     }
 
     osquery::Status BrokerManager::setNodeID(const std::string &uid) {
@@ -79,8 +81,7 @@ namespace osquery {
     }
 
     std::vector <std::string> BrokerManager::getGroups() {
-        //TODO: read dynamic list
-        return this->groups;//{"eu/de/HH/UHH"};
+        return this->groups;
     }
 
 /////////////////////////////////////////////////////////
@@ -164,119 +165,6 @@ namespace osquery {
 
 
 /////////////////////////////////////////////////////////
-//////////////// Schedule/Query Handling ////////////////
-/////////////////////////////////////////////////////////
-
-    std::string BrokerManager::addBrokerOneTimeQueryEntry(const SubscriptionRequest &qr) {
-        const std::string queryID = std::to_string(this->_nextUID++);
-        if (addBrokerQueryEntry(queryID, qr, "ONETIME").ok())
-            return queryID;
-        else
-            return "-1";
-    }
-
-    osquery::Status BrokerManager::addBrokerScheduleQueryEntry(const SubscriptionRequest &qr) {
-        const std::string queryID = std::to_string(this->_nextUID++);
-        return addBrokerQueryEntry(queryID, qr, "SCHEDULE");
-    }
-
-    Status
-    BrokerManager::addBrokerQueryEntry(const std::string &queryID, const SubscriptionRequest &qr, std::string qtype) {
-        std::string query = qr.query;
-        std::string response_event = qr.response_event;
-        std::string response_topic = qr.response_topic;
-        int interval = qr.interval;
-        bool added = qr.added;
-        bool removed = qr.removed;
-        bool snapshot = qr.snapshot;
-        if (this->brokerScheduleQueries.find(queryID) != this->brokerScheduleQueries.end() or
-            this->brokerOneTimeQueries.find(queryID) != this->brokerOneTimeQueries.end()) {
-            LOG(ERROR) << "QueryID '" << queryID << "' already exists";
-            return Status(1, "Duplicate queryID");
-        }
-
-        if (qtype == "SCHEDULE")
-            this->brokerScheduleQueries[queryID] = BrokerScheduleQueryEntry{queryID, query, interval, added, removed,
-                                                                            snapshot};
-        else if (qtype == "ONETIME")
-            this->brokerOneTimeQueries[queryID] = BrokerOneTimeQueryEntry{queryID, query};
-        else
-            LOG(ERROR) << "Unknown query type :" << qtype;
-        this->eventNames[queryID] = response_event;
-        this->eventTopics[queryID] = response_topic;
-        return Status(0, "OK");
-    }
-
-
-    std::string BrokerManager::findIDForQuery(const std::string &query) {
-        // Search the queryID for this specific query
-        for (const auto &e: this->brokerScheduleQueries) {
-            std::string queryID = e.first;
-            BrokerScheduleQueryEntry bqe = e.second;
-            if (std::get<1>(bqe) == query) {
-                return queryID;
-            }
-        }
-
-        for (const auto &e: this->brokerOneTimeQueries) {
-            std::string queryID = e.first;
-            BrokerOneTimeQueryEntry bqe = e.second;
-            if (std::get<1>(bqe) == query) {
-                return queryID;
-            }
-        }
-        return "";
-    }
-
-
-    Status BrokerManager::removeBrokerQueryEntry(const std::string &query) {
-        std::string queryID = this->findIDForQuery(query);
-        if (queryID == "") {
-            LOG(ERROR) << "Unable to find ID for query: '" << query << "'";
-            return Status(1, "Unable to find ID for query");
-        }
-
-        // Delete query info
-        this->eventTopics.erase(queryID);
-        this->eventNames.erase(queryID);
-        if (this->brokerScheduleQueries.find(queryID) != this->brokerScheduleQueries.end()) {
-            LOG(INFO) << "Deleting schedule query '" << query << "' with queryID '" << queryID << "'";
-            this->brokerScheduleQueries.erase(queryID);
-        } else if (this->brokerOneTimeQueries.find(queryID) != this->brokerOneTimeQueries.end()) {
-            LOG(INFO) << "Deleting onetime query '" << query << "' with queryID '" << queryID << "'";
-            this->brokerOneTimeQueries.erase(queryID);
-        }
-
-        return Status(0, "OK");
-    }
-
-    std::string BrokerManager::getQueryConfigString() {
-        // Format each query
-        std::vector <std::string> scheduleQ;
-        for (const auto &bq: brokerScheduleQueries) {
-            auto i = bq.second;
-            std::stringstream ss;
-            ss << "\"" << std::get<0>(i) << "\": {\"query\": \"" << std::get<1>(i) << ";\", \"interval\": "
-               << std::get<2>(i) << ", \"added\": " << std::get<3>(i) << ", \"removed\": " << std::get<4>(i)
-               << ", \"snapshot\": " << std::get<5>(i) << "}";
-            std::string q = ss.str();
-            scheduleQ.push_back(q);
-        }
-
-        // Assemble queries
-        std::stringstream ss;
-        for (size_t i = 0; i < scheduleQ.size(); ++i) {
-            if (i != 0)
-                ss << ",";
-            ss << scheduleQ[i];
-        }
-        std::string queries = ss.str();
-        std::string config = std::string("{\"schedule\": {") + queries + std::string("} }");
-
-        return config;
-    }
-
-/////////////////////////////////////////////////////////
 //////////////// Broker Send Methods/////////////////////
 /////////////////////////////////////////////////////////
 
@@ -290,18 +178,12 @@ namespace osquery {
 //  std::map<std::string, std::string> decorations = qli.decorations;me;
 
 
-        // Is this schedule or one-time?
+        // Is this schedule or one-time? Get Query and Type
         std::string query;
         std::string qType;
-        if (this->brokerScheduleQueries.find(queryID) != this->brokerScheduleQueries.end()) {
-            qType = "SCHEDULE";
-            query = std::get<1>(this->brokerScheduleQueries.at(queryID));
-        } else if (this->brokerOneTimeQueries.find(queryID) != this->brokerOneTimeQueries.end()) {
-            qType = "ONETIME";
-            query = std::get<1>(this->brokerOneTimeQueries.at(queryID));
-        } else {
-            LOG(ERROR) << "QueryID not in brokerQueries";
-            return Status(1, "Unknown QueryID");
+        auto status_find = this->qm->findQueryAndType(queryID, qType, query);
+        if ( !status_find.ok() ) {
+            return status_find;
         }
 
         // Rows to be reported
@@ -309,7 +191,7 @@ namespace osquery {
         for (const auto &row: qli.results.added) {
             rows.emplace_back(row, "ADDED");
         }
-        for (const auto &row: qli.results.added) {
+        for (const auto &row: qli.results.removed) {
             rows.emplace_back(row, "REMOVED");
         }
         for (const auto &row: qli.snapshot_results) {
@@ -330,8 +212,8 @@ namespace osquery {
 
         // Common message fields
         std::string uid = this->getNodeID();
-        std::string topic = this->eventTopics.at(queryID);
-        std::string event_name = this->eventNames.at(queryID);
+        std::string topic = this->qm->getEventTopic(queryID);
+        std::string event_name = this->qm->getEventName(queryID);
         LOG(INFO) << "Creating " << rows.size() << " messages for events with name :'" << event_name << "'";
 
 
@@ -399,7 +281,7 @@ namespace osquery {
 
         // Delete one-time query information
         if (qType == "ONETIME") {
-            this->removeBrokerQueryEntry(query);
+            this->qm->removeQueryEntry(query);
         }
 
         return Status(0, "OK");

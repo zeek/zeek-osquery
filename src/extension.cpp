@@ -5,6 +5,7 @@
 
 //#include "logger.h"
 #include "BrokerManager.h"
+#include "QueryManager.h"
 //#include "Parser.h"
 #include "utils.h"
 #include "plugins.h"
@@ -63,6 +64,7 @@ int main(int argc, char *argv[]) {
     LOG(INFO) << "Setup Broker Manager";
     broker::init();
     BrokerManager *bm = BrokerManager::getInstance();
+    QueryManager *qm = QueryManager::getInstance();
     // UID
     if ( ! bro_uid.empty() )
         bm->setNodeID( bro_uid );
@@ -133,7 +135,7 @@ int main(int argc, char *argv[]) {
                         // One-Time Query Execution
                         SubscriptionRequest sr;
                         createSubscriptionRequest("QUERY", msg, topic, sr);
-                        std::string newQID = bm->addBrokerOneTimeQueryEntry(sr);
+                        std::string newQID = qm->addOneTimeQueryEntry(sr);
                         if (newQID == "-1") {
                             LOG(ERROR) << "Unable to add Broker Query Entry";
                             runner.requestShutdown(1);
@@ -150,7 +152,7 @@ int main(int argc, char *argv[]) {
 
                         if (results.empty()) {
                             LOG(INFO) << "One-time query: " << sr.response_event << " has no results";
-                            bm->removeBrokerQueryEntry(sr.query);
+                            qm->removeQueryEntry(sr.query);
                             continue;
                         }
 
@@ -184,7 +186,7 @@ int main(int argc, char *argv[]) {
                         // New SQL Query Request
                         SubscriptionRequest sr;
                         createSubscriptionRequest("SUBSCRIBE", msg, topic, sr);
-                        bm->addBrokerScheduleQueryEntry(sr);
+                        qm->addScheduleQueryEntry(sr);
 
                     // osquery::host_unsubscribe
                     } else if (eventName == bm->EVENT_HOST_UNSUBSCRIBE) {
@@ -194,7 +196,7 @@ int main(int argc, char *argv[]) {
                         //TODO: find an UNIQUE identifier (currently the exact sql string)
                         std::string query = sr.query;
 
-                        bm->removeBrokerQueryEntry(query);
+                        qm->removeQueryEntry(query);
 
                     } else {
                         // Unkown Message
@@ -205,7 +207,7 @@ int main(int argc, char *argv[]) {
 
                     // Apply to new config/schedule
                     std::map <std::string, std::string> config_schedule;
-                    config_schedule["bro"] = bm->getQueryConfigString();
+                    config_schedule["bro"] = qm->getQueryConfigString();
                     LOG(INFO) << "Applying new schedule: " << config_schedule["bro"];
                     osquery::Config::getInstance().update(config_schedule);
                 }

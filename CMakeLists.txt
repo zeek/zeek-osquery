@@ -18,6 +18,7 @@ set(PROJECT_SOURCES
 #  src/logger.cpp
   src/extension.cpp
   src/utils.cpp
+  src/QueryManager.cpp
   src/BrokerManager.cpp
   src/plugins.cpp
 #  src/Parser.cpp
