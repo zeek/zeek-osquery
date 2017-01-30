@@ -38,6 +38,7 @@ event host_mounts(host: string, utype: string,
                       $flags = flags
 			               ];
 	
+	#print fmt("Writing mount with device '%s' and device_alias '%s' mounted to path '%s'", device, device_alias, path);
 	Log::write(LOG, info);
 	}
 

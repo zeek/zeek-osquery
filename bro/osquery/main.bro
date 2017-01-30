@@ -68,7 +68,7 @@ export {
 		## The osquery SQL query selecting the activity to subscribe to.
 		query: string;
 		## The type of update to report.
-		utype: UpdateType &default=BOTH;
+		utype: UpdateType &default=ADD;
 		## The interval of the query
 		inter: count &optional;
 		## The Broker topic THEY send the query result to
@@ -264,12 +264,12 @@ function send_subscribe(topic: string, ev: Event)
 	
 	log_peer("info", "osquery", fmt("%s event %s() with '%s'",
 					"subscribing to", ev_name, ev$query));
-        print fmt("%s event %s() with '%s'",
-                                        "subscribing to", ev_name, ev$query);
+        #print fmt("%s event %s() with '%s'",
+                                        #"subscribing to", ev_name, ev$query);
 
 	local update_type = "BOTH";
 	if ( ev$utype == ADD )
-		update_type = "ADD";
+		update_type = "ADDED";
 
 	if ( ev$utype == REMOVE )
 		update_type = "REMOVED";
@@ -294,12 +294,12 @@ function send_unsubscribe(topic: string, ev: Event)
 	
 	log_peer("info", "osquery", fmt("%s event %s() with '%s'",
 					"unsubscribing from", ev_name, ev$query));
-	print fmt("%s event %s() with '%s'",
-                                        "unsubscribing from", ev_name, ev$query);
+	#print fmt("%s event %s() with '%s'",
+                                        #"unsubscribing from", ev_name, ev$query);
 
 	local update_type = "BOTH";
 	if ( ev$utype == ADD )
-		update_type = "ADD";
+		update_type = "ADDED";
 
 	if ( ev$utype == REMOVE )
 		update_type = "REMOVED";
@@ -360,8 +360,8 @@ function send_query(topic: string, ev: Event)
 
         log_peer("info", "osquery", fmt("%s event %s() with '%s'", 
                                         "subscribing to", ev_name, ev$query));
-        print fmt("%s event %s() with '%s'",
-                                        "executing", ev_name, ev$query);
+        #print fmt("%s event %s() with '%s'",
+                                        #"executing", ev_name, ev$query);
 
 	local resT = topic;
         if ( ev?$resT )
@@ -384,7 +384,7 @@ function send_subscriptions(client_id: string)
 
                 if ( ! s?$ev ) 
 			{
-                        print "Skipping Subscription because event was deleted";
+                        #print "Skipping Subscription because event was deleted";
                         next;
 			}
 
@@ -514,7 +514,7 @@ event host_error(peer_name: string, msg: string)
 
 event osquery::host_new(client_id: string, group_list: vector of string, addr_list: vector of addr)
 	{
-	print "New Host Annoucement", client_id, group_list, addr_list;
+	#print fmt("New Host Annoucement from client: %s", client_id);
 	log_local("info", fmt("Received new announce message with uid %s", client_id));
 	log_peer("info", client_id, "New osquery host announcement");
 
@@ -535,13 +535,13 @@ event osquery::host_new(client_id: string, group_list: vector of string, addr_li
 #TODO: Handle peer_name and client_id
 event Broker::incoming_connection_established(peer_name: string)
 	{
-	print fmt("Incoming connection from peer: %s", peer_name);
+	#print fmt("Incoming connection from peer: %s", peer_name);
 	log_peer("info", peer_name, "incoming connection established");
 	}
 
 event Broker::incoming_connection_broken(peer_name: string)
 	{
-	print fmt("Connection broken to peer: %s", peer_name);
+	#print fmt("Connection broken to peer: %s", peer_name);
 	log_peer("info", peer_name, "incoming connection broken");
 
 	# Internal client tracking

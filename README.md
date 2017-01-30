@@ -1,12 +1,12 @@
-# Branch Info #
-This is a development branch of `bro-osquery`that aims for creating additional report capabilities of the `osquery` host sensor. Using the network security monitor `Bro` and its communication library `broker`, we make `osquery` to receive SQL subscription from `Bro` and to return events occuring on the monitored host matching the SQL query.
+# Project Info #
+This extension adds a Bro interface to the host monitor [osquery](https://osquery.io), enabling the network monitor [Bro](https://www.bro.org) to subscribe to changes from hosts as a continous stream of events. The extension is controlled from Bro scripts, which sends SQL-style queries to the hosts and then begins listening for any updates coming back. Host events are handled by Bro scripts the same way as network events.
 
 ## Architecture ##
-We design this solution according to some requirements:
+We designed this architecture according to some requirements:
 
 * We want these report capabilities with few osquery changes as possible. Also, users should be able to use bro-osquery without having to re-compile osquery or bro-osquery on their own.
 
-Therefore, this branch is development bro-osquery with characteristics as follows:
+Therefore, bro-osquery is developed with characteristics as follows:
 
 1. **Writing bro-osquery mainly as extension**
     * Having our solution implemented as an osquery extension, we can distribute this binary to any user that wants to extend an existing osquery installation.
@@ -14,11 +14,11 @@ Therefore, this branch is development bro-osquery with characteristics as follow
    
 2. **Using the osquery scheduler**
     * Bro-osquery will (mainly) not actively schedule and execute the SQL queries. Instead, it maintains all queries requested by any Bro to update the interal osquery schedule with new queries.
-    * For this reason, the extension directly updates the schedule/config of osquery directly without the need for any config-plugin. Hence, config-plugin should be disabled by the run flag `--config_plugin update`.
+    * For this reason, the extension directly updates the schedule/config of osquery directly without the need for any config-plugin. However, we made the extension configuration part of the regular config. Hence, config-plugin should be set to retrieve an initial configuration (e.g. `--config_plugin filesystem`).
    
 3. **Using LoggerPluging**
-    * Osquery calls the logger-plugin to log the results of a query, (including/exclusively?) the [results of scheduled queries](https://github.com/facebook/osquery/blob/master/osquery/dispatcher/scheduler.cpp#L79). The logger-plugin sends each result row as an event back to the respective bro.
-    * A result row can be mapped to a specific SQL schedule query, and the respective Bro that subscribed to this query.
+    * Osquery calls the logger-plugin to log the [results of scheduled queries](https://github.com/facebook/osquery/blob/master/osquery/dispatcher/scheduler.cpp#L79). The logger-plugin sends each result row as an event back to the respective bro.
+    * A result (row) can be mapped to a specific SQL schedule query, and the respective Bro that subscribed to this query. Furthermore, this allows to parse the result values and convert them to datatypes according to the query.
     * To be able to parse the serialized log string, the run flag `--log_result_events=0` must be set.
  
 4. **Using one Broker Endpoint**
@@ -32,7 +32,7 @@ Therefore, this branch is development bro-osquery with characteristics as follow
 
  
 ## Installation ##
- As this branch is under heavy development, we currently also work on a build system to integrate `bro-osquery` into `osquery`. There is no working solution for all platforms yet. However, here are some implications when compiling `bro-osquery`:
+ As this project is under heavy development, we currently also work on a build system to integrate `bro-osquery` into `osquery`. There is no working solution for all platforms yet. However, here are some implications when compiling `bro-osquery`:
  
  1. Osquery comes with its own dependencies, system libraries and compilers (delivered with brew). As a result, also the library `libosquery` is build with this custom tool-chain.
  2. When building bro-osquery and including/linking against `libosquery`, we need the very same tool-chain. That is why we will integrate bro-osquery into the build system of osquery.
@@ -41,17 +41,20 @@ Therefore, this branch is development bro-osquery with characteristics as follow
      * -stdlib=libstdc++
      * Several system libraries in `/usr/local/osquery`
      
-Once the build process is stable, we will release an install script.
+We are working on a stable build process an release an install script as soon as possible.
 
 ## Deployment ##
-The config file (i.e. `/etc/osquery/osquery.conf`) was extended by another key named `bro`. The setting `bro_endpoint` must be set such that:
+After installation, the config file (i.e. `/etc/osquery/osquery.conf`) needs to be modified. Running the bro-osquery extension requires to retrieve at least the IP address of the Bro instanace it connects to. Therefore, the configuration was extended by the key named `bro`. The setting `bro_ip` must be set such that:
 
     {
-    // Configure the daemon below:
       "bro": {
         // Address of bro
-        "bro_endpoint": "172.17.0.2:9999"
+        "bro_ip": "172.17.0.2"
       },
     
       "options": {
-        ...
+        "logger_plugin": "bro"
+      }
+    }
+
+To run bro-osquery, start the osquery deamon along with the extension. Load the osquery framework scripts in Bro to schedule queries. 

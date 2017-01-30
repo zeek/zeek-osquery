@@ -14,21 +14,25 @@ export {
         type Info: record {
                 t: time &log;
                 host: string &log;
-                name: string &log;
                 username: string &log;
+                name: string &log;
+		agent: string &log;
         };
 }
+
+global http_agent: string;
 
 event host_browser(client_id: string, utype: string,
                 name: string, username: string)
         {
-	print fmt("User %s is running %s as browser", username, name);
+	#print fmt("User %s is running %s as browser", username, name);
 
 	local info: Info = [
                 $t=network_time(),
                 $host=client_id,
+		$username=username,
 		$name=name,
-		$username=username
+		$agent=http_agent
         ];
 
         Log::write(LOG, info);
@@ -38,29 +42,18 @@ event http_request(c: connection, method: string, original_URI: string, unescape
 	{
 	local ip = addr_to_uri(c$id$orig_h);
 	local p = port_to_count(c$id$orig_p);
-	print fmt("http_request seen from %s:%d", ip, p);
+	#print fmt("http_request seen from %s:%d", ip, p);
 
-	print fmt("Asking host to send process information");
 	local query = fmt("SELECT p.name, u.username FROM process_open_sockets s, processes p, users u WHERE s.local_port=%d AND s.pid=p.pid AND p.uid=u.uid",p);
 	osquery::execute([$ev=host_browser,$query=query]);
-	}
-
-
-event http_reply(c: connection, version: string, code: count, reason: string)
-	{
-	print "http_reply: ", code;
-	}
-
-event http_event(c: connection, event_type: string, detail: string)
-	{
-	print "HTTP Error: ", detail;
 	}
 
 event http_header(c: connection, is_orig: bool, name: string, value: string) 
 	{
 	if (name == "USER-AGENT") 
 		{
-		print fmt("http_header: name=%s, value=%s", name, value);
+		#print fmt("http_header: name=%s, value=%s", name, value);
+		http_agent = value;
 		}
 	}
 
@@ -70,7 +63,4 @@ event bro_init()
         Log::create_stream(LOG, [$columns=Info, $path="osq-example-framework2"]);
 
 	Broker::enable();
-
-#        local ev = [$ev=host_unixTime,$query="SELECT unix_time from time"];
-#        osquery::subscribe(ev);
         }

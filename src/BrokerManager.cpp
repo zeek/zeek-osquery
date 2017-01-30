@@ -5,6 +5,8 @@
 #include <broker/endpoint.hh>
 #include <broker/message_queue.hh>
 
+#include "utils.h"
+
 #include "BrokerManager.h"
 #include "QueryManager.h"
 #include <iostream>
@@ -218,6 +220,7 @@ namespace osquery {
 
 
         // Create message for each row
+        bool err = false;
         for (const auto &element: rows) {
             // Get row and trigger
             osquery::Row row = std::get<0>(element);
@@ -234,6 +237,10 @@ namespace osquery {
                 std::string colName = std::get<0>(t);
                 if ( row.count(colName) != 1 ) {
                     LOG(ERROR) << "Column '" << colName << "' not present in results for '" << event_name << "'";
+                    for (const auto& pair: row) {
+                        LOG(ERROR) << "\t<" << pair.first << ", " << pair.second << "> ";
+                    }
+                    err = true;
                     break;
                 }
                 std::string value = row.at(colName);
@@ -277,6 +284,10 @@ namespace osquery {
 
             // Send event message
             this->sendEvent(topic, msg);
+        }
+
+        if ( err ) {
+            printQueryLogItem(qli);
         }
 
         // Delete one-time query information

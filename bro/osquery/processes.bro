@@ -48,7 +48,7 @@ event host_processes(host: string, utype: string,
                 $pgroup = pgroup
         ];
 
-	print fmt("Writing process with PID '%d' and name '%s'", pid, name);
+	#print fmt("Writing process with PID '%d' and name '%s'", pid, name);
         Log::write(LOG, info);
         }
 

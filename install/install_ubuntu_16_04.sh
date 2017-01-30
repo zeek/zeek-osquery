@@ -147,7 +147,6 @@ function downloadBroOsquery() {
   echo "Downloading Bro-Osquery"
   git clone https://github.com/bro/bro-osquery extension_bro_osquery
   cd extension_bro_osquery
-  git checkout dev/haas
  fi
 
   cd $tmp_dir
@@ -311,17 +310,14 @@ echo "#### CONFIGURATION ###"
 cd ${WORKING_DIR}
 echo "--- Bro-OSquery ---"
 cd osquery/osquery/external/extension_bro_osquery
-sudo mkdir /var/osquery
-sudo cp etc/broker.ini.in /var/osquery/broker.ini
 echo "Run: sudo ./osquery/build/linux/osquery/external/extension_bro_osquery/bro-osquery.ext"
-echo "Configuration: /var/osquery/broker.ini"
+echo "Configuration: /etc/osquery/osquery.config"
 cd ${WORKING_DIR}
 echo ""
 echo "--- OSquery ---"
 cd osquery
 sudo mkdir /etc/osquery
-sudo mkdir -p /var/log/osquery
-sudo cp tools/deployment/osquery.example.conf /etc/osquery/osquery.conf
+#sudo cp tools/deployment/osquery.example.conf /etc/osquery/osquery.conf
 echo "Run: sudo osqueryi / sudo osqueryd"
 echo "Configuration: /etc/osquery/osquery.conf"
 echo ""

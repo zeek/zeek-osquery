@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
     // Setup OSquery Extension
     LOG(INFO) << "Starting osquery extention: bro-osquery";
     Initializer runner(argc, argv, ToolType::EXTENSION);
-    auto status_ext = startExtension("bro-osquery", "0.0.1");
+    auto status_ext = startExtension("bro-osquery", "1.0.0");
     if (!status_ext.ok()) {
         LOG(ERROR) << status_ext.getMessage();
         runner.requestShutdown(status_ext.getCode());

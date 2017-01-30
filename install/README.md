@@ -10,7 +10,7 @@ This procedure requires some tools to be intalled:
 Then execute the install script as a sudo user:  
 
 	git clone https://github.com/bro/bro-osquery  
-	cd bro-osquery && git checkout dev/haas  
+	cd bro-osquery  
 	cd install && ./install_ubuntu_16_04.sh  
 
 Afterwards, you can run `osquery` and the `bro-osquery` extension:
@@ -54,7 +54,7 @@ The interesting part happens for the integration of `bro-osquery`. These project
 * Create the folder `./osquery/osquery/external/`
 * Will modify the CMake file to include all projects in this *external* directory as potential [extensions](https://osquery.readthedocs.io/en/stable/development/osquery-sdk/#extensions). This functionality was introduced by this [commit](https://github.com/facebook/osquery/pull/2385). 
 
-For convenience, we download the complete `bro-osquery` project from [Github](https://github.com/bro/bro-osquery/tree/dev/haas) and save it as  `./osquery/osquery/external/extension_bro_osquery` (this brach *dev/haas*). The folder contains a CMake file that is not meant to be invoked standalone but during the build process of `osquery`.
+For convenience, we download the complete `bro-osquery` project from [Github](https://github.com/bro/bro-osquery/tree/dev/haas) and save it as  `./osquery/osquery/external/extension_bro_osquery`. The folder contains a CMake file that is not meant to be invoked standalone but during the build process of `osquery`.
 
 Therefore, we now build `osquery` a second time. This time, it includes the `extension_bro_osquery` folder and compiles `bro-osquery` as an *extension*.
 
