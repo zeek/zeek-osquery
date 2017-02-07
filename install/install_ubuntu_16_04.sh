@@ -30,14 +30,36 @@ function downloadCAF() {
   git checkout tags/0.14.5
   # Patch
   echo "---" > patchfile
-  echo " CMakeLists.txt | 10 +++++++++-" >> patchfile
-  echo " 1 file changed, 9 insertions(+), 1 deletion(-)" >> patchfile
+  echo " CMakeLists.txt | 51 ++++++++++++++++++++++++++++++++++++++++++++++-----" >> patchfile
+  echo " 1 file changed, 46 insertions(+), 5 deletions(-)" >> patchfile
   echo "" >> patchfile
   echo "diff --git a/CMakeLists.txt b/CMakeLists.txt" >> patchfile
-  echo "index 9a20c5e..11d4b21 100644" >> patchfile
+  echo "index 9a20c5e..d506b9d 100644" >> patchfile
   echo "--- a/CMakeLists.txt" >> patchfile
   echo "+++ b/CMakeLists.txt" >> patchfile
-  echo "@@ -222,11 +222,19 @@ if(CMAKE_CXX_FLAGS)" >> patchfile
+  echo "@@ -152,7 +152,7 @@ endif()" >> patchfile
+  echo " # add -stdlib=libc++ when using Clang if possible" >> patchfile
+  echo " if(NOT CAF_NO_AUTO_LIBCPP AND \"\${CMAKE_CXX_COMPILER_ID}\" MATCHES \"Clang\")" >> patchfile
+  echo "   set(CXXFLAGS_BACKUP \"\${CMAKE_CXX_FLAGS}\")" >> patchfile
+  echo "-  set(CMAKE_CXX_FLAGS \"-std=c++11 -stdlib=libc++\")" >> patchfile
+  echo "+    set(CMAKE_CXX_FLAGS \"-std=c++11 -stdlib=libc++\")" >> patchfile
+  echo "   try_run(ProgramResult" >> patchfile
+  echo "           CompilationSucceeded" >> patchfile
+  echo "           \"\${CMAKE_CURRENT_BINARY_DIR}\"" >> patchfile
+  echo "@@ -161,9 +161,9 @@ if(NOT CAF_NO_AUTO_LIBCPP AND \"\${CMAKE_CXX_COMPILER_ID}\" MATCHES \"Clang\")" >> patchfile
+  echo "   if(NOT CompilationSucceeded OR NOT ProgramResult EQUAL 0)" >> patchfile
+  echo "     message(STATUS \"Use clang with GCC' libstdc++\")" >> patchfile
+  echo "   else()" >> patchfile
+  echo "-    message(STATUS \"Automatically added '-stdlib=libc++' flag \"" >> patchfile
+  echo "-                   \"(CAF_NO_AUTO_LIBCPP not defined)\")" >> patchfile
+  echo "-    set(EXTRA_FLAGS \"\${EXTRA_FLAGS} -stdlib=libc++\")" >> patchfile
+  echo "+	  message(STATUS \"Automatically added '-stdlib=libc++' flag \"" >> patchfile
+  echo "+	          \"(CAF_NO_AUTO_LIBCPP not defined)\")" >> patchfile
+  echo "+	  set(EXTRA_FLAGS \"\${EXTRA_FLAGS} -stdlib=libc++\")" >> patchfile
+  echo "   endif()" >> patchfile
+  echo "   # restore CXX flags" >> patchfile
+  echo "   set(CMAKE_CXX_FLAGS \"\${CXXFLAGS_BACKUP}\")" >> patchfile
+  echo "@@ -222,11 +222,52 @@ if(CMAKE_CXX_FLAGS)" >> patchfile
   echo "   set(CMAKE_CXX_FLAGS_RELEASE        \"\")" >> patchfile
   echo "   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO \"\")" >> patchfile
   echo " else()" >> patchfile
@@ -45,21 +67,54 @@ function downloadCAF() {
   echo "+  set(BUILD_DEPS \"/usr/local/osquery\")" >> patchfile
   echo "+  set(CPP11_FLAGS \"-std=c++11 -stdlib=libstdc++\")" >> patchfile
   echo "+  set(STATIC_FLAGS \"-static-libstdc++\")" >> patchfile
-  echo "+  set(STATIC_SYSTEM_LIBS \"-l:\${BUILD_DEPS}/legacy/lib/libpthread.so\" \"-l:\${BUILD_DEPS}/lib/libz.so\" \"-l:\${BUILD_DEPS}/legacy/lib/libdl.so\" \"-l:\${BUILD_DEPS}/legacy/lib/librt.so\" \"-l:\${BUILD_DEPS}/legacy/lib/libc.so\" \"-rdynamic\" \"-l:\${BUILD_DEPS}/lib/libgcc_s.so\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+  set(default_prefix \"\${BUILD_DEPS}\")" >> patchfile
+  echo "+  set(legacy_prefix \"\${BUILD_DEPS}/legacy\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+  set(CFLAGS \"-isystem\${default_prefix}/include \${CFLAGS}\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+  set(CFLAGS \"-L\${default_prefix}/lib \${CFLAGS}\")" >> patchfile
+  echo "+  set(CFLAGS \"-L\${default_prefix}/lib \${CFLAGS}\")" >> patchfile
+  echo "+  set(CXXFLAGS \"-L\${default_prefix}/lib \${CXXFLAGS}\")" >> patchfile
+  echo "+  set(CXXFLAGS \"-L\${legacy_prefix}/lib \${CXXFLAGS}\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+  set(CXXFLAGS \"-I\${default_prefix}/include \${CXXFLAGS}\")" >> patchfile
+  echo "+  set(CXXFLAGS \"-I\${legacy_prefix}/include \${CXXFLAGS}\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+  set(CFLAGS  \"-isystem\${legacy_prefix}/include \${CFLAGS}\")" >> patchfile
+  echo "+  set(CXXFLAGS \"-isystem\${legacy_prefix}/include \${CXXFLAGS}\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+  set(LDFLAGS \"\${LDFLAGS} -Wl,--dynamic-linker=\${legacy_prefix}/lib/ld-linux-x86-64.so.2\")" >> patchfile
+  echo "+  set(LDFLAGS \"\${LDFLAGS} -Wl,-rpath,\${legacy_prefix}/lib\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+  set(LDFLAGS \"\${LDFLAGS} -Wl,-rpath,\${default_prefix}/lib\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+  set(LDFLAGS \"\${LDFLAGS} -L\${default_prefix}/lib\")" >> patchfile
+  echo "+  set(LDFLAGS \"-L\${default_prefix}/lib \${LDFLAGS}\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+  set(LDFLAGS \"\${LDFLAGS} -lrt -pthread -ldl\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+  set(CFLAGS \"\${CFLAGS} -fPIC -DNDEBUG -Os -march=core2\")" >> patchfile
+  echo "+  set(CXXFLAGS \"\${CXXFLAGS} -fPIC -DNDEBUG -Os -march=core2\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+" >> patchfile
+  echo "+  set(CMAKE_MODULE_LINKER_FLAGS \${LDFLAGS})" >> patchfile
+  echo "+  set(CMAKE_SHARED_LINKER_FLAGS \${LDFLAGS})" >> patchfile
+  echo "+  set(CMAKE_STATIC_LINKER_FLAGS \${LDFLAGS})" >> patchfile
+  echo "+" >> patchfile
   echo "+  set(CMAKE_CXX_FLAGS \"\${CPP11_FLAGS} -Wextra -Wall -pedantic \${EXTRA_FLAGS}\")" >> patchfile
   echo "   set(CMAKE_CXX_FLAGS_DEBUG          \"-O0 -g\")" >> patchfile
   echo "   set(CMAKE_CXX_FLAGS_MINSIZEREL     \"-Os\")" >> patchfile
   echo "   set(CMAKE_CXX_FLAGS_RELEASE        \"-O3 -DNDEBUG\")" >> patchfile
   echo "   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO \"-O2 -g\")" >> patchfile
-  echo "+  include_directories(SYSTEM \"\${BUILD_DEPS}/legacy/include\")" >> patchfile
-  echo "+  include_directories(SYSTEM \"\${BUILD_DEPS}/include\")" >> patchfile
-  echo "+ set(CMAKE_CXX_STANDARD_LIBRARIES \${STATIC_SYSTEM_LIBS})" >> patchfile
-  echo "+ set(CMAKE_CXX_STANDARD_LIBRARIES \${STATIC_FLAGS})" >> patchfile
+  echo "+  " >> patchfile
+  echo "+  set(CMAKE_C_FLAGS \"\${CFLAGS} \${CMAKE_C_FLAGS}\")" >> patchfile
+  echo "+  set(CMAKE_CXX_FLAGS \"\${CXXFLAGS} \${CMAKE_CXX_FLAGS}\")" >> patchfile
   echo " endif()" >> patchfile
   echo " # set build default build type to RelWithDebInfo if not set" >> patchfile
   echo " if(NOT CMAKE_BUILD_TYPE)" >> patchfile
   echo "-- " >> patchfile
-  echo "1.9.1" >> patchfile
+  echo "2.7.4" >> patchfile
   patch -p1 < patchfile
  fi
 
@@ -79,37 +134,102 @@ function downloadBroker() {
   cd broker
 
   echo "Patching Broker"
-  # Patch
+  # Patch tool chain
   echo "---" > patchfile
-  echo " CMakeLists.txt | 12 ++++++++++++" >> patchfile
-  echo " 1 file changed, 12 insertions(+)" >> patchfile
+  echo " CMakeLists.txt | 50 +++++++++++++++++++++++++++++++++++++++++++++++++-" >> patchfile
+  echo " 1 file changed, 49 insertions(+), 1 deletion(-)" >> patchfile
   echo "" >> patchfile
   echo "diff --git a/CMakeLists.txt b/CMakeLists.txt" >> patchfile
-  echo "index e439cde..f1e0be3 100644" >> patchfile
+  echo "index e439cde..a0d0855 100644" >> patchfile
   echo "--- a/CMakeLists.txt" >> patchfile
   echo "+++ b/CMakeLists.txt" >> patchfile
-  echo "@@ -165,6 +165,18 @@ add_subdirectory(tests)" >> patchfile
+  echo "@@ -158,12 +158,60 @@ if ( ENABLE_STATIC )" >> patchfile
+  echo "     install(TARGETS brokerStatic DESTINATION \${INSTALL_LIB_DIR})" >> patchfile
+  echo " endif ()" >> patchfile
   echo " " >> patchfile
-  echo " string(TOUPPER \${CMAKE_BUILD_TYPE} BuildType)" >> patchfile
-  echo " " >> patchfile
-  echo "+  set(BUILD_DEPS \"/usr/local/osquery\")" >> patchfile
-  echo "+  set(CPP11_FLAGS \"-std=c++11 -stdlib=libstdc++\")" >> patchfile
-  echo "+  set(STATIC_FLAGS \"-static-libstdc++\")" >> patchfile
-  echo "+  set(STATIC_SYSTEM_LIBS \"-l:\${BUILD_DEPS}/legacy/lib/libpthread.so\" \"-l:\${BUILD_DEPS}/lib/libz.so\" \"-l:\${BUILD_DEPS}/legacy/lib/libdl.so\" \"-l:\${BUILD_DEPS}/legacy/lib/librt.so\" \"-l:\${BUILD_DEPS}/legacy/lib/libc.so\" \"-rdynamic\" \"-l:\${BUILD_DEPS}/lib/libgcc_s.so\")" >> patchfile
-  echo "+set(CMAKE_CXX_FLAGS \"\${CPP11_FLAGS} -ftemplate-depth=512 \${CMAKE_CXX_FLAGS}\")" >> patchfile
-  echo "+include_directories(SYSTEM \"\${BUILD_DEPS}/legacy/include\")" >> patchfile
-  echo "+include_directories(SYSTEM \"\${BUILD_DEPS}/include\")" >> patchfile
-  echo "+link_directories(\"/usr/local/osquery/lib\")" >> patchfile
-  echo "+set(CMAKE_CXX_STANDARD_LIBRARIES \${STATIC_SYSTEM_LIBS})" >> patchfile
-  echo "+set(CMAKE_CXX_STANDARD_LIBRARIES \${STATIC_FLAGS})" >> patchfile
+  echo "+string(TOUPPER \${CMAKE_BUILD_TYPE} BuildType)" >> patchfile
+  echo "+" >> patchfile
+  echo "+set(BUILD_DEPS \"/usr/local/osquery\")" >> patchfile
+  echo "+set(CPP11_FLAGS \"-std=c++11 -stdlib=libstdc++\")" >> patchfile
+  echo "+set(STATIC_FLAGS \"-static-libstdc++\")" >> patchfile
+  echo "+set(default_prefix \"\${BUILD_DEPS}\")" >> patchfile
+  echo "+set(legacy_prefix \"\${BUILD_DEPS}/legacy\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+set(CFLAGS \"-isystem\${default_prefix}/include \${CFLAGS}\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+set(CFLAGS \"-L\${default_prefix}/lib \${CFLAGS}\")" >> patchfile
+  echo "+set(CFLAGS \"-L\${default_prefix}/lib \${CFLAGS}\")" >> patchfile
+  echo "+set(CXXFLAGS \"-L\${default_prefix}/lib \${CXXFLAGS}\")" >> patchfile
+  echo "+set(CXXFLAGS \"-L\${legacy_prefix}/lib \${CXXFLAGS}\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+set(CXXFLAGS \"-I\${default_prefix}/include \${CXXFLAGS}\")" >> patchfile
+  echo "+set(CXXFLAGS \"-I\${legacy_prefix}/include \${CXXFLAGS}\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+set(CFLAGS  \"-isystem\${legacy_prefix}/include \${CFLAGS}\")" >> patchfile
+  echo "+set(CXXFLAGS \"-isystem\${legacy_prefix}/include \${CXXFLAGS}\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+set(LDFLAGS \"\${LDFLAGS} -Wl,--dynamic-linker=\${legacy_prefix}/lib/ld-linux-x86-64.so.2\")" >> patchfile
+  echo "+set(LDFLAGS \"\${LDFLAGS} -Wl,-rpath,\${legacy_prefix}/lib\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+set(LDFLAGS \"\${LDFLAGS} -Wl,-rpath,\${default_prefix}/lib\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+set(LDFLAGS \"\${LDFLAGS} -L\${default_prefix}/lib\")" >> patchfile
+  echo "+set(LDFLAGS \"-L\${default_prefix}/lib \${LDFLAGS}\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+set(LDFLAGS \"\${LDFLAGS} -lrt -pthread -ldl\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+set(CFLAGS \"\${CFLAGS} -fPIC -DNDEBUG -Os -march=core2\")" >> patchfile
+  echo "+set(CXXFLAGS \"\${CXXFLAGS} -fPIC -DNDEBUG -Os -march=core2\")" >> patchfile
   echo "+" >> patchfile
   echo "+" >> patchfile
+  echo "+set(CMAKE_MODULE_LINKER_FLAGS \${LDFLAGS})" >> patchfile
+  echo "+set(CMAKE_SHARED_LINKER_FLAGS \${LDFLAGS})" >> patchfile
+  echo "+set(CMAKE_STATIC_LINKER_FLAGS \${LDFLAGS})" >> patchfile
+  echo "+" >> patchfile
+  echo "+set(CMAKE_CXX_FLAGS \"\${CPP11_FLAGS} -Wextra -Wall -pedantic -ftemplate-depth=512 \${EXTRA_FLAGS}\")" >> patchfile
+  echo "+set(CMAKE_CXX_FLAGS_DEBUG          \"-O0 -g\")" >> patchfile
+  echo "+set(CMAKE_CXX_FLAGS_MINSIZEREL     \"-Os\")" >> patchfile
+  echo "+set(CMAKE_CXX_FLAGS_RELEASE        \"-O3 -DNDEBUG\")" >> patchfile
+  echo "+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO \"-O2 -g\")" >> patchfile
+  echo "+" >> patchfile
+  echo "+set(CMAKE_C_FLAGS \"\${CFLAGS} \${CMAKE_C_FLAGS}\")" >> patchfile
+  echo "+set(CMAKE_CXX_FLAGS \"\${CXXFLAGS} \${CMAKE_CXX_FLAGS}\")" >> patchfile
+  echo "+" >> patchfile
+  echo " add_subdirectory(bindings)" >> patchfile
+  echo " " >> patchfile
+  echo " enable_testing()" >> patchfile
+  echo " add_subdirectory(tests)" >> patchfile
+  echo " " >> patchfile
+  echo "-string(TOUPPER \${CMAKE_BUILD_TYPE} BuildType)" >> patchfile
+  echo "+" >> patchfile
+  echo " " >> patchfile
   echo " #------------------------------------------------------------------------------" >> patchfile
   echo " #                                Build Summary" >> patchfile
-  echo " #------------------------------------------------------------------------------" >> patchfile
   echo "-- " >> patchfile
-  echo "1.9.1" >> patchfile
+  echo "2.7.4" >> patchfile
   patch -p1 < patchfile
+  
+  # Patch disable tests
+  echo "---" > patchfile2
+  echo " CMakeLists.txt | 2 +-" >> patchfile2
+  echo " 1 file changed, 1 insertion(+), 1 deletion(-)" >> patchfile2
+  echo "" >> patchfile2
+  echo "diff --git a/CMakeLists.txt b/CMakeLists.txt" >> patchfile2
+  echo "index a0d0855..3786df1 100644" >> patchfile2
+  echo "--- a/CMakeLists.txt" >> patchfile2
+  echo "+++ b/CMakeLists.txt" >> patchfile2
+  echo "@@ -209,7 +209,7 @@ set(CMAKE_CXX_FLAGS \"\${CXXFLAGS} \${CMAKE_CXX_FLAGS}\")" >> patchfile2
+  echo " add_subdirectory(bindings)" >> patchfile2
+  echo " " >> patchfile2
+  echo " enable_testing()" >> patchfile2
+  echo "-add_subdirectory(tests)" >> patchfile2
+  echo "+#add_subdirectory(tests)" >> patchfile2
+  echo " " >> patchfile2
+  echo " " >> patchfile2
+  echo " " >> patchfile2
+  echo "-- " >> patchfile2
+  echo "2.7.4" >> patchfile2
+  patch -p1 < patchfile2
  fi
 
   cd $tmp_dir
@@ -140,7 +260,7 @@ function downloadOsquery() {
 
 function downloadBroOsquery() {
  tmp_dir=$(pwd)
- cd ${WORKING_DIR}/osquery/osquery/external
+ cd ${WORKING_DIR}/osquery/external
  if [ -d "extension_bro_osquery" ]; then
   echo "Bro-Osquery already installed"
  else
@@ -154,7 +274,7 @@ function downloadBroOsquery() {
 
 function patchOsqueryForExtensions() {
  tmp_dir=$(pwd)
- cd ${WORKING_DIR}/osquery/osquery
+ cd ${WORKING_DIR}/osquery
  if [ -d "external" ]; then
   echo "Osquery already prepared for extensions"
  else
@@ -276,7 +396,7 @@ echo
 echo "--- Build ACTOR FRAMEWORK ---"
 echo
 cd ${WORKING_DIR}/actor-framework
-./configure --no-auto-libc++
+./configure --no-auto-libc++ --no-examples --no-unit-tests
 make -j${CORES} && sudo make install
 cd ${WORKING_DIR}
 
@@ -284,7 +404,7 @@ echo
 echo "--- Build BROKER---"
 echo
 cd ${WORKING_DIR}/broker
-./configure
+./configure --disable-pybroker
 make -j${CORES} && sudo make install
 cd ${WORKING_DIR}
 

@@ -29,9 +29,9 @@ SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 ADD_OSQUERY_EXTENSION(${PROJECT_NAME} ${PROJECT_SOURCES})
 target_link_libraries(${PROJECT_NAME} ${LINK_LIBS})
 set(CPP11_FLAGS "-std=c++11 -stdlib=libstdc++")
-set(CMAKE_CXX_FLAGS "${CPP11_FLAGS} ${CMAKE_CXX_FLAGS} /usr/local/osquery/Cellar/glibc/2.19/lib/libc.so -Wl,-rpath,/usr/local/lib")
-include_directories(SYSTEM "${BUILD_DEPS}/legacy/include")
-include_directories(SYSTEM "${BUILD_DEPS}/include")
+set(CMAKE_CXX_FLAGS "${CPP11_FLAGS} ${CMAKE_CXX_FLAGS} -Wl,-rpath,/usr/local/lib")
+#include_directories(SYSTEM "${BUILD_DEPS}/legacy/include")
+#include_directories(SYSTEM "${BUILD_DEPS}/include")
 
 # Bro-OSquery Configuration File
 #set(BROSERY_INI_PATH "${CMAKE_INSTALL_PREFIX}/etc/brosquery/config.ini")
