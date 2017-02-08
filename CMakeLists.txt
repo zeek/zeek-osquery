@@ -12,7 +12,7 @@ find_package(Broker REQUIRED)
 include_directories(BEFORE ${BROKER_INCLUDE_DIRS})
 include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 #include_directories(BEFORE ${CMAKE_BINARY_DIR}/src)
-set(LINK_LIBS ${LINK_LIBS} ${BROKER_LIBRARY} ${LIBCAF_LIBRARIES})
+set(LINK_LIBS ${BROKER_LIBRARY} ${LIBCAF_LIBRARIES})
 
 set(PROJECT_SOURCES
 #  src/logger.cpp
@@ -24,12 +24,12 @@ set(PROJECT_SOURCES
 #  src/Parser.cpp
 )
 
-SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+#SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 ADD_OSQUERY_EXTENSION(${PROJECT_NAME} ${PROJECT_SOURCES})
 target_link_libraries(${PROJECT_NAME} ${LINK_LIBS})
-set(CPP11_FLAGS "-std=c++11 -stdlib=libstdc++")
-set(CMAKE_CXX_FLAGS "${CPP11_FLAGS} ${CMAKE_CXX_FLAGS} -Wl,-rpath,/usr/local/lib")
+#set(CPP11_FLAGS "-std=c++11 -stdlib=libstdc++")
+#set(CMAKE_CXX_FLAGS "${CPP11_FLAGS} ${CMAKE_CXX_FLAGS} -Wl,-rpath,/usr/local/lib")
 #include_directories(SYSTEM "${BUILD_DEPS}/legacy/include")
 #include_directories(SYSTEM "${BUILD_DEPS}/include")
 
