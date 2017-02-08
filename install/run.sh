@@ -5,4 +5,3 @@ echo "./osquery/build/linux/external/extension_bro_osquery/bro-osquery.ext" > ex
 
 echo "Executing: $osquerydCMD"
 $($osquerydCMD)
-
