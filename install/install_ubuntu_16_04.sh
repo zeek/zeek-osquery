@@ -85,9 +85,9 @@ function downloadCAF() {
   echo "+  set(CXXFLAGS \"-isystem\${legacy_prefix}/include \${CXXFLAGS}\")" >> patchfile
   echo "+" >> patchfile
   echo "+  set(LDFLAGS \"\${LDFLAGS} -Wl,--dynamic-linker=\${legacy_prefix}/lib/ld-linux-x86-64.so.2\")" >> patchfile
-  echo "+  set(LDFLAGS \"\${LDFLAGS} -Wl,-rpath,\${legacy_prefix}/lib\")" >> patchfile
+  echo "+  #set(LDFLAGS \"\${LDFLAGS} -Wl,-rpath,\${legacy_prefix}/lib\")" >> patchfile
   echo "+" >> patchfile
-  echo "+  set(LDFLAGS \"\${LDFLAGS} -Wl,-rpath,\${default_prefix}/lib\")" >> patchfile
+  echo "+  #set(LDFLAGS \"\${LDFLAGS} -Wl,-rpath,\${default_prefix}/lib\")" >> patchfile
   echo "+" >> patchfile
   echo "+  set(LDFLAGS \"\${LDFLAGS} -L\${default_prefix}/lib\")" >> patchfile
   echo "+  set(LDFLAGS \"-L\${default_prefix}/lib \${LDFLAGS}\")" >> patchfile
@@ -100,9 +100,9 @@ function downloadCAF() {
   echo "+" >> patchfile
   echo "+  set(CMAKE_MODULE_LINKER_FLAGS \${LDFLAGS})" >> patchfile
   echo "+  set(CMAKE_SHARED_LINKER_FLAGS \${LDFLAGS})" >> patchfile
-  echo "+  set(CMAKE_STATIC_LINKER_FLAGS \${LDFLAGS})" >> patchfile
+  echo "+  #set(CMAKE_STATIC_LINKER_FLAGS \${LDFLAGS})" >> patchfile
   echo "+" >> patchfile
-  echo "+  set(CMAKE_CXX_FLAGS \"\${CPP11_FLAGS} -Wextra -Wall -pedantic \${EXTRA_FLAGS}\")" >> patchfile
+  echo "+  set(CMAKE_CXX_FLAGS \"\${CPP11_FLAGS} \${STATIC_FLAGS} -Wextra -Wall -pedantic \${EXTRA_FLAGS}\")" >> patchfile
   echo "   set(CMAKE_CXX_FLAGS_DEBUG          \"-O0 -g\")" >> patchfile
   echo "   set(CMAKE_CXX_FLAGS_MINSIZEREL     \"-Os\")" >> patchfile
   echo "   set(CMAKE_CXX_FLAGS_RELEASE        \"-O3 -DNDEBUG\")" >> patchfile
@@ -169,9 +169,9 @@ function downloadBroker() {
   echo "+set(CXXFLAGS \"-isystem\${legacy_prefix}/include \${CXXFLAGS}\")" >> patchfile
   echo "+" >> patchfile
   echo "+set(LDFLAGS \"\${LDFLAGS} -Wl,--dynamic-linker=\${legacy_prefix}/lib/ld-linux-x86-64.so.2\")" >> patchfile
-  echo "+set(LDFLAGS \"\${LDFLAGS} -Wl,-rpath,\${legacy_prefix}/lib\")" >> patchfile
+  echo "+#set(LDFLAGS \"\${LDFLAGS} -Wl,-rpath,\${legacy_prefix}/lib\")" >> patchfile
   echo "+" >> patchfile
-  echo "+set(LDFLAGS \"\${LDFLAGS} -Wl,-rpath,\${default_prefix}/lib\")" >> patchfile
+  echo "+#set(LDFLAGS \"\${LDFLAGS} -Wl,-rpath,\${default_prefix}/lib\")" >> patchfile
   echo "+" >> patchfile
   echo "+set(LDFLAGS \"\${LDFLAGS} -L\${default_prefix}/lib\")" >> patchfile
   echo "+set(LDFLAGS \"-L\${default_prefix}/lib \${LDFLAGS}\")" >> patchfile
@@ -184,9 +184,9 @@ function downloadBroker() {
   echo "+" >> patchfile
   echo "+set(CMAKE_MODULE_LINKER_FLAGS \${LDFLAGS})" >> patchfile
   echo "+set(CMAKE_SHARED_LINKER_FLAGS \${LDFLAGS})" >> patchfile
-  echo "+set(CMAKE_STATIC_LINKER_FLAGS \${LDFLAGS})" >> patchfile
+  echo "+#set(CMAKE_STATIC_LINKER_FLAGS \${LDFLAGS})" >> patchfile
   echo "+" >> patchfile
-  echo "+set(CMAKE_CXX_FLAGS \"\${CPP11_FLAGS} -Wextra -Wall -pedantic -ftemplate-depth=512 \${EXTRA_FLAGS}\")" >> patchfile
+  echo "+set(CMAKE_CXX_FLAGS \"\${CPP11_FLAGS} \${STATIC_FLAGS} -Wextra -Wall -pedantic -ftemplate-depth=512 \${EXTRA_FLAGS}\")" >> patchfile
   echo "+set(CMAKE_CXX_FLAGS_DEBUG          \"-O0 -g\")" >> patchfile
   echo "+set(CMAKE_CXX_FLAGS_MINSIZEREL     \"-Os\")" >> patchfile
   echo "+set(CMAKE_CXX_FLAGS_RELEASE        \"-O3 -DNDEBUG\")" >> patchfile
@@ -275,6 +275,39 @@ function downloadBroOsquery() {
 function patchOsqueryForExtensions() {
  tmp_dir=$(pwd)
  cd ${WORKING_DIR}/osquery
+ # Patch external call
+ echo "---" > patchfile6
+ echo " osquery/CMakeLists.txt | 6 +++---" >> patchfile6
+ echo " 1 file changed, 3 insertions(+), 3 deletions(-)" >> patchfile6
+ echo "" >> patchfile6
+ echo "diff --git a/osquery/CMakeLists.txt b/osquery/CMakeLists.txt" >> patchfile6
+ echo "index e7cad39..9a4f1d3 100644" >> patchfile6
+ echo "--- a/osquery/CMakeLists.txt" >> patchfile6
+ echo "+++ b/osquery/CMakeLists.txt" >> patchfile6
+ echo "@@ -149,9 +149,6 @@ add_subdirectory(registry)" >> patchfile6
+ echo " add_subdirectory(sql)" >> patchfile6
+ echo " add_subdirectory(remote)" >> patchfile6
+ echo " " >> patchfile6
+ echo "-# Add externals directory from parent" >> patchfile6
+ echo "-add_subdirectory(\"\${CMAKE_SOURCE_DIR}/external\" \"\${CMAKE_BINARY_DIR}/external\")" >> patchfile6
+ echo "-" >> patchfile6
+ echo " if(NOT DEFINED ENV{SKIP_TABLES})" >> patchfile6
+ echo "   add_subdirectory(tables)" >> patchfile6
+ echo " " >> patchfile6
+ echo "@@ -312,6 +309,9 @@ if(NOT \${OSQUERY_BUILD_SDK_ONLY})" >> patchfile6
+ echo "   endif()" >> patchfile6
+ echo " endif()" >> patchfile6
+ echo " " >> patchfile6
+ echo "+# Add externals directory from parent" >> patchfile6
+ echo "+add_subdirectory(\"\${CMAKE_SOURCE_DIR}/external\" \"\${CMAKE_BINARY_DIR}/external\")" >> patchfile6
+ echo "+" >> patchfile6
+ echo " if(NOT DEFINED ENV{SKIP_TESTS})" >> patchfile6
+ echo "   # osquery testing library (testing helper methods/libs)." >> patchfile6
+ echo "   add_library(libosquery_testing STATIC tests/test_util.cpp)" >> patchfile6
+ echo "-- " >> patchfile6
+ echo "2.7.4" >> patchfile6
+ patch -p1 < patchfile6
+
  if [ -d "external" ]; then
   echo "Osquery already prepared for extensions"
  else
@@ -385,7 +418,8 @@ echo
 echo "--- Build OSQUERY ---"
 echo
 cd ${WORKING_DIR}/osquery
-make deps && make -j${CORES} && sudo make install
+make deps 
+make -j${CORES} && sudo make install
 cd ${WORKING_DIR}
 
 # Provide build invironment
@@ -396,6 +430,7 @@ echo
 echo "--- Build ACTOR FRAMEWORK ---"
 echo
 cd ${WORKING_DIR}/actor-framework
+#./configure --no-auto-libc++ --no-examples --no-unit-tests --build-static-only
 ./configure --no-auto-libc++ --no-examples --no-unit-tests
 make -j${CORES} && sudo make install
 cd ${WORKING_DIR}
@@ -404,6 +439,7 @@ echo
 echo "--- Build BROKER---"
 echo
 cd ${WORKING_DIR}/broker
+#./configure --disable-pybroker --enable-static-only
 ./configure --disable-pybroker
 make -j${CORES} && sudo make install
 cd ${WORKING_DIR}
