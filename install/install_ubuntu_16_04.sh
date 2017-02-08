@@ -463,17 +463,24 @@ make bro-osquery -j${CORES} # Will build the third party extension
 echo
 echo
 echo "#### CONFIGURATION ###"
-cd ${WORKING_DIR}
 echo "--- Bro-OSquery ---"
-cd osquery/osquery/external/extension_bro_osquery
-echo "Run: sudo ./osquery/build/linux/osquery/external/extension_bro_osquery/bro-osquery.ext"
-echo "Configuration: /etc/osquery/osquery.config"
 cd ${WORKING_DIR}
+cd osquery/external/extension_bro_osquery
+echo "Run: sudo ./osquery/build/linux/external/extension_bro_osquery/bro-osquery.ext"
+echo "Configuration: /etc/osquery/osquery.config"
 echo ""
 echo "--- OSquery ---"
-cd osquery
-sudo mkdir /etc/osquery
-#sudo cp tools/deployment/osquery.example.conf /etc/osquery/osquery.conf
+cd ${WORKING_DIR}
+if [ ! -d "/etc/osquery" ]; then
+  sudo mkdir -p /etc/osquery
+fi
+if [ ! -f "/etc/osquery/osquery.conf" ]; then
+cd osquery/external/extension_bro_osquery
+  sudo cp install/osquery.example.conf /etc/osquery/osquery.conf
+fi
+if [ ! -d "/var/osquery/" ]; then
+  sudo mkdir -p /var/osquery/
+fi
 echo "Run: sudo osqueryi / sudo osqueryd"
 echo "Configuration: /etc/osquery/osquery.conf"
 echo ""
