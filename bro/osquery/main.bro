@@ -14,6 +14,8 @@ export {
 	const HostAnnounceTopic: string = fmt("%s/announce",TopicPrefix) &redef;
 	# Topic for individual hosts
 	const HostIndividualTopic: string = fmt("%s/uid",TopicPrefix) &redef;
+	# Topic for groups
+	const HostGroupTopic: string = fmt("%s/group",TopicPrefix) &redef;
 	# Topic to address all hosts (default to send query requests)
 	const HostBroadcastTopic: string = fmt("%s/all",TopicPrefix) &redef;
 	# Undividual channel of this bro instance (default to receive query results)
@@ -63,8 +65,8 @@ export {
 		SNAPSHOT##< Report the current status at query time.
 	};
 
-	## Type defining a single event to subscribe to.
-	type Event: record {
+	## Type defining a SQL query and schedule/execution parameters to be send to hosts.
+	type Query: record {
 		## The osquery SQL query selecting the activity to subscribe to.
 		query: string;
 		## The type of update to report.
@@ -75,8 +77,16 @@ export {
 		resT: string &default=BroID_Topic;
 		## The Bro event to execute when receiving updates.
 		ev: any &optional;
+		## A cookie we can set to match the result event
+		cookie: string &default="";
 	};
 
+	## Type defining the event header of responses
+	type ResultInfo: record {
+		host: string;
+		utype: UpdateType;
+		cookie: string &optional;
+	};
 
 ###
 ### Functions
@@ -89,7 +99,7 @@ export {
 	##
 	## topic: The topic where the subscription is send to. All hosts in this group will
 	## get the subscription.
-	global subscribe: function(ev: Event, topic: string &default=HostBroadcastTopic);
+	global subscribe: function(q: Query, host: string &default="", group: string &default="");
 
 	## Unsubscribe to an event from clients. This will get sent to all clients
         ## that are currently connected and would match a similar subscribe
@@ -99,7 +109,7 @@ export {
 	##
 	## topic: The topic where the subscription is send to. All hosts in this group will
 	## get the subscription.
-        global unsubscribe: function(ev: Event, topic: string &default=HostBroadcastTopic);
+        global unsubscribe: function(q: Query, host: string &default="", group: string &default="");
 
 	## Subscribe to multiple events. Whenever an osquery client connects to us, we'll
 	## subscribe to all matching activity from it.
@@ -108,7 +118,7 @@ export {
 	##
 	## topic: The topic where the subscription is send to. All hosts in this group will
 	## get the subscription.
-	global subscribe_multiple: function(evs: vector of Event, topic: string &default=HostBroadcastTopic);
+	global subscribe_multiple: function(qs: vector of Query, host_list: vector of string &default=vector(""), group_list: vector of string &default=vector(""));
 
 	## Unsubscribe from multiple events. This will get sent to all clients
         ## that are currently connected and would match a similar subscribe
@@ -118,7 +128,7 @@ export {
 	##
 	## topic: The topic where the subscription is send to. All hosts in this group will
 	## get the subscription.
-        global unsubscribe_multiple: function(evs: vector of Event, topic: string &default=HostBroadcastTopic);
+        global unsubscribe_multiple: function(qs: vector of Query, host_list: vector of string &default=vector(""), group_list: vector of string &default=vector(""));
 
 	## Send a one-time query to all current clients in a specific group.
 	##
@@ -126,7 +136,7 @@ export {
         ##
 	## topic: The topic where the subscription is send to. All hosts in this group will
 	## get the subscription.
-	global execute: function(ev: Event, topic: string &default=HostBroadcastTopic);
+	global execute: function(q: Query, host: string &default="", group: string &default="");
 	
 	## Send a multiple one-time queries to all current clients in a specific group.
 	##
@@ -134,14 +144,21 @@ export {
         ##
 	## topic: The topic where the subscription is send to. All hosts in this group will
 	## get the subscriptions.
-	global execute_multiple: function(evs: vector of Event, topic: string &default=HostBroadcastTopic);
+	global execute_multiple: function(qs: vector of Query, host_list: vector of string &default=vector(""), group_list: vector of string &default=vector(""));
 
 	## Instruct a subnet to join a specific group. Respective clients subscribe
 	## to the given topic
 	##
 	## range: the subnet that is addressed
 	## group: the topic hosts should subscribe to 
-#	global set_host_group: function(range: subnet, group: string);
+	global set_host_group: function(range: subnet, group: string);
+	
+	## Instruct a subnet to join a specific group. Respective clients subscribe
+	## to the given topic
+	##
+	## range: the subnet that is addressed
+	## group: the topic hosts should subscribe to 
+#	global set_host_group_multiple: function(range_list: vector of subnet, group_list: vector of string);
 
 ###
 ### Events from Clients
@@ -151,22 +168,22 @@ export {
 	##
 	## client_id: An id that uniquely identifies an osquery host 
         ## addr_list: A list of IP addresses of that osquery host
-        global host_new: event (client_id: string, group_list: vector of string, addr_list: vector of addr);
+        global host_new: event (host_id: string, group_list: vector of string, addr_list: vector of addr);
 
 	# Event sent by clients to report an error.
 	#
 	# TODO: Add peer_name.
-	global host_error: event(client_id: string, msg: string);
+	global host_error: event(host_id: string, msg: string);
 
 	# Event sent by clients to report a warning.
 	#
 	# TODO: Add peer_name.
-	global host_warning: event(client_id: string, msg: string);
+	global host_warning: event(host_id: string, msg: string);
 
 	# Event sent by clients to report an informational log message.
 	#
 	# TODO: Add peer_name.
-	global host_log: event(client_id: string, msg: string);
+	global host_log: event(host_id: string, msg: string);
 
 }
 
@@ -175,16 +192,18 @@ export {
 ###
 
 # Sent by us to the client for subscribing to an event.
-global host_subscribe: event(ev: string, query: string, resT: string, utype: string, inter: count);
+global host_subscribe: event(ev: string, query: string, cookie: string, resT: string, utype: string, inter: count);
 
 # Sent by us to the client for unsubscribing from an event.
-global host_unsubscribe: event(ev: string, query: string, resT: string, utype: string, inter: count);
+global host_unsubscribe: event(ev: string, query: string, cookie: string, resT: string, utype: string, inter: count);
 
-# Sent by us to the client for one-time query execution
-global host_query: event(ev: string, query: string, resT: string, utype: string);
+# Sent by us to the client for one-time query execution.
+global host_execute: event(ev: string, query: string, cookie: string, resT: string, utype: string);
 
-# Sent by us to set the topic for the client to publish its events with.
-#global host_set_topic: event(topic: string);
+# Sent by us to client to make him subscribe to the topic.
+global host_join: event(group: string);
+	
+global host_test: event(utype: UpdateType);
 
 ###
 ### Internal Structures
@@ -192,8 +211,9 @@ global host_query: event(ev: string, query: string, resT: string, utype: string)
 
 # Internal record for tracking a subscription.
 type Subscription: record {
-	topic: string;
-	ev: Event;
+	query: Query;
+	hosts: vector of string;
+	groups: vector of string;
 };
 
 # Internal vector of subscriptions
@@ -205,11 +225,20 @@ global hosts: set[string];
 # Internal table for tracking client (ids) and their respective addresses
 global host_addresses: table[string] of vector of addr;
 
+# Internal record for tracking dynamic groups
+type Collection: record {
+	group: string;
+	ranges: vector of subnet;
+};
+
+# Internal vector of host collections
+global collections: vector of Collection;
+
 # Internal set for groups of clients
 global groups: set[string] = {HostBroadcastTopic};
 
 # Internal table for tracking client (ids) and their respective groups
-global host_groups: table[string] of vector of string;# &default="default";
+global host_groups: table[string] of vector of string;
 
 
 ###############################
@@ -251,158 +280,220 @@ function log_local(level: string, msg: string)
 
 ###
 ### Subscription Sending
-###
-
 ## Sends the interest given by ev to the client
 ##
 ## client_id: The client ID
 ## ev: The event of type Event
-function send_subscribe(topic: string, ev: Event)
+function send_subscribe(topic: string, query: Query)
 	{
-	local ev_name = split_string(fmt("%s", ev$ev), /\n/)[0];
+	local ev_name = split_string(fmt("%s", query$ev), /\n/)[0];
         local host_topic = topic;
 	
 	log_peer("info", "osquery", fmt("%s event %s() with '%s'",
-					"subscribing to", ev_name, ev$query));
+					"subscribing to", ev_name, query$query));
         #print fmt("%s event %s() with '%s'",
-                                        #"subscribing to", ev_name, ev$query);
+        #                                "subscribing to", ev_name, query$query);
 
 	local update_type = "BOTH";
-	if ( ev$utype == ADD )
+	if ( query$utype == ADD )
 		update_type = "ADDED";
 
-	if ( ev$utype == REMOVE )
+	if ( query$utype == REMOVE )
 		update_type = "REMOVED";
 
+	local cookie = query$cookie;
+
 	local resT = topic;
-	if ( ev?$resT )
-		resT = ev$resT;
+	if ( query?$resT )
+		resT = query$resT;
 	Broker::subscribe_to_events(resT);
 
 	local inter: count = 10;
-	if ( ev?$inter )
-		inter = ev$inter;
+	if ( query?$inter )
+		inter = query$inter;
 
-	local ev_args = Broker::event_args(host_subscribe, ev_name, ev$query, resT, update_type, inter);
+	local ev_args = Broker::event_args(host_subscribe, ev_name, query$query, cookie, resT, update_type, inter);
 	Broker::send_event(host_topic, ev_args);
 	} 
 
-function send_unsubscribe(topic: string, ev: Event)
+function send_unsubscribe(topic: string, query: Query)
 	{
-	local ev_name = split_string(fmt("%s", ev$ev), /\n/)[0];
+	local ev_name = split_string(fmt("%s", query$ev), /\n/)[0];
 	local host_topic = topic;
 	
 	log_peer("info", "osquery", fmt("%s event %s() with '%s'",
-					"unsubscribing from", ev_name, ev$query));
+					"unsubscribing from", ev_name, query$query));
 	#print fmt("%s event %s() with '%s'",
-                                        #"unsubscribing from", ev_name, ev$query);
+                                        #"unsubscribing from", ev_name, query$query);
 
 	local update_type = "BOTH";
-	if ( ev$utype == ADD )
+	if ( query$utype == ADD )
 		update_type = "ADDED";
 
-	if ( ev$utype == REMOVE )
+	if ( query$utype == REMOVE )
 		update_type = "REMOVED";
+	
+	local cookie = query$cookie;
 
 	local resT = topic;
-        if ( ev?$resT )
-                resT = ev$resT;
+        if ( query?$resT )
+                resT = query$resT;
 
         local inter: count = 10;
-        if ( ev?$inter )
-                inter = ev$inter;
+        if ( query?$inter )
+                inter = query$inter;
 
-        local ev_args = Broker::event_args(host_unsubscribe, ev_name, ev$query, resT, update_type, inter);
+        local ev_args = Broker::event_args(host_unsubscribe, ev_name, query$query, cookie, resT, update_type, inter);
         Broker::send_event(host_topic, ev_args);
         }
 
-function same_event(ev1: Event, ev2: Event) : bool
+function same_event(q1: Query, q2: Query) : bool
 	{
-	if ( ev1$query!=ev2$query  )
+	if ( q1$query!=q2$query  )
 		return F;
-	if ( (ev1?$ev!=ev2?$ev) )
+	if ( (q1?$ev!=q2?$ev) )
 		return F;
-	if ( ev1?$ev && fmt("%s", ev1$ev)!=fmt("%s", ev2$ev) )
+	if ( q1?$ev && fmt("%s", q1$ev)!=fmt("%s", q2$ev) )
 		return F;
-	if ( (ev1?$utype!=ev2?$utype) )
+	if ( (q1?$utype!=q2?$utype) )
 		return F;
-	if ( ev1?$utype && ev1$utype!=ev2$utype )
+	if ( q1?$utype && q1$utype!=q2$utype )
 		return F;
-	if ( (ev1?$resT!=ev2?$resT) )
+	if ( (q1?$resT!=q2?$resT) )
 		return F;
-	if ( ev1?$resT && ev1$resT!=ev2$resT )
+	if ( q1?$resT && q1$resT!=q2$resT )
 		return F;
-	if ( (ev1?$inter!=ev2?$inter) )
+	if ( (q1?$inter!=q2?$inter) )
 		return F;
-	if ( ev1?$inter && ev1$inter!=ev2$inter )
+	if ( q1?$inter && q1$inter!=q2$inter )
 		return F;
 
 	return T;
 	}
 
-#function set_host_group(peer_name: string, group: string)
-#	{
-#	if ( group !in groups )
-#		{
-#		local topic = fmt("/bro/osquery/group/%s", group);
-#		log_local("info", fmt("subscribing to topic %s", topic));
-#		Broker::subscribe_to_events(topic);
-#		add groups[group];
-#		}
-#
-#	host_groups[peer_name] = group;
-#	}
 
-function send_query(topic: string, ev: Event)
+function send_execute(topic: string, q: Query)
         {
-        local ev_name = split_string(fmt("%s", ev$ev), /\n/)[0];
+        local ev_name = split_string(fmt("%s", q$ev), /\n/)[0];
         local host_topic = topic;
 
         log_peer("info", "osquery", fmt("%s event %s() with '%s'", 
-                                        "subscribing to", ev_name, ev$query));
+                                        "subscribing to", ev_name, q$query));
         #print fmt("%s event %s() with '%s'",
-                                        #"executing", ev_name, ev$query);
+                                        #"executing", ev_name, q$query);
+
+	local cookie = q$cookie;
 
 	local resT = topic;
-        if ( ev?$resT )
-                resT = ev$resT;
+        if ( q?$resT )
+                resT = q$resT;
 	Broker::subscribe_to_events(resT);
 
-        local ev_args = Broker::event_args(host_query, ev_name, ev$query, resT, "SNAPSHOT");
+        local ev_args = Broker::event_args(host_execute, ev_name, q$query, cookie, resT, "SNAPSHOT");
         Broker::send_event(host_topic, ev_args);
         }
+
 
 ## Sends current subscriptions to the osquery host (given by client_id)
 ## if the subscription topic filter matches at least one of the hosts groups.
 ##
 ## client_id: The client ID
-function send_subscriptions(client_id: string)
+function send_subscriptions(host_id: string)
         {
+	local host_topic = fmt("%s/%s", HostIndividualTopic, host_id);
         for ( i in subscriptions )
                 {
                 local s = subscriptions[i];
+		local skip_subscription = F;
 
-                if ( ! s?$ev ) 
+                if ( ! s$query?$ev ) 
 			{
-                        #print "Skipping Subscription because event was deleted";
+                        # Skip Subscription because it was deleted";
                         next;
 			}
 
-	        local topic: string = s$topic;
-	        for ( group in groups)
+	        local sub_hosts: vector of string = s$hosts;
+		for ( j in sub_hosts )
+			{
+			local sub_host = sub_hosts[j];	
+			if (host_id == sub_host)
+				{
+				send_subscribe(host_topic, s$query);
+				skip_subscription = T;
+				break;
+				}
+			}
+		if (skip_subscription)
+			next;
+
+		local sub_groups: vector of string = s$groups;
+	        for ( j in host_groups[host_id] )
 	        	{
-#		        local group: string = host_groups[client_id][k];
-	                # Send only to topics that match to at least one group
-	                if ( |group| <= |topic| && group == topic[:|group|] )
-	                	{
-				local host_topic = fmt("%s/%s", HostIndividualTopic, client_id);
-	                        send_subscribe(host_topic, s$ev);
-	                        break;
-	                        }
-	                }
+			local host_group = host_groups[host_id][j];
+			for ( k in sub_groups )
+				{
+				local sub_group = sub_groups[k];
+				if ( |host_group| <= |sub_group| && host_group == sub_group[:|host_group|]);
+					{
+					send_subscribe(host_topic, s$query);
+					skip_subscription = T;
+					break;
+					}
+				}
+			if (skip_subscription)
+				break;
+			}
+		if (skip_subscription)
+			next;
                 }
         }
 
+function send_test(host_topic: string)
+	{
+	local ev_args = Broker::event_args(host_test, ADD);
+	Broker::send_event(host_topic, ev_args);
+	}
+
+function send_join(host_topic: string, group: string)
+	{
+        local ev_args = Broker::event_args(host_join, group);
+        Broker::send_event(host_topic, ev_args);
+	}
+
+function send_collections(host_id: string)
+	{
+	local host_topic = fmt("%s/%s",HostIndividualTopic,host_id);
+	for ( i in collections )
+		{
+		local c = collections[i];
+		local skip_collection = F;
+
+		if ( c$group=="" )
+			# Skip because Collection was deleted
+			next;
+
+		for (j in host_addresses[host_id])
+			{
+			local address = host_addresses[host_id][j];
+			for (k in c$ranges)
+				{
+				local range = c$ranges[k];
+				if (address in range)
+					{
+					local new_group: string = c$group;
+					log_host("info", host_id, fmt("joining new group %s", new_group));
+					send_join( host_topic, new_group );
+					host_groups[host_id][|host_groups[host_id]|] = new_group;
+					add groups[new_group];
+					skip_collection = T;
+					break;
+					}
+				}
+			if (skip_collection)
+				break;
+			}
+		}
+	}
 ###
 ### Subscription Management
 ###
@@ -410,59 +501,137 @@ function send_subscriptions(client_id: string)
 ### We need functions whenever subscription or clients change.
 ###
 
-function subscribe(ev: Event, topic: string)
+function subscribe(q: Query, host: string, group: string)
         {
-        # Include new Subscription in the vector
-        subscriptions[|subscriptions|] = [$topic=topic, $ev=ev];
+	local qs: vector of Query = vector(q);
+	local host_list: vector of string = vector(host);
+	local group_list: vector of string = vector(group);
+	subscribe_multiple(qs, host_list, group_list);
+        }
 
-	local group: string;
-	for ( group in groups)
+function unsubscribe(q: Query, host: string, group: string)
+       {
+	local qs: vector of Query = vector(q);
+	local host_list: vector of string = vector(host);
+	local group_list: vector of string = vector(group);
+	unsubscribe_multiple(qs, host_list, group_list);
+	}
+
+function subscribe_multiple(qs: vector of Query, host_list: vector of string, group_list: vector of string)
+        {
+        for ( i in qs )
 		{
-		# Send only to topics that match to at least one host's group
-		if ( |group| <= |topic| && group == topic[:|group|] )
+        	# Include new Subscription in the vector
+	        subscriptions[|subscriptions|] = [$query=qs[i], $hosts=host_list, $groups=group_list];
+		if (|host_list|<=1 && host_list[0]=="" && |group_list|<=1 && group_list[0]=="")
 			{
-                               send_subscribe(topic, ev);
-                               break;
+			# To all if nothing specified
+			send_subscribe(HostBroadcastTopic, qs[i]);
+			}
+		else
+			{
+			# To specific host
+			for (j in host_list)
+				if (host_list[j] != "")
+					send_subscribe(fmt("%s/%s",HostIndividualTopic,host_list[j]), qs[i]);
+			# To specific group
+			for (j in group_list)
+				if (group_list[j] != "")
+					send_subscribe(fmt("%s/%s",HostGroupTopic,group_list[j]), qs[i]);
 			}
 		}
         }
 
-function unsubscribe(ev: Event, topic: string)
-       {
-       for ( i in subscriptions )
-               {
-               if ( same_event(subscriptions[i]$ev, ev) )
-			# Don't have a delete for vector, so set it to no-op
-      			# by leaving the event empty.
-			subscriptions[i]$ev = [$query=""];
-               }
-
-	# Unsubscribe from current clients.
-        send_unsubscribe(topic, ev);
-        }
-
-function subscribe_multiple(evs: vector of Event, topic: string)
-        {
-        for ( i in evs )
-                subscribe(evs[i], topic);
-        }
-
-function unsubscribe_multiple(evs: vector of Event, topic: string)
-        {
-        for ( i in evs )
-                unsubscribe(evs[i], topic);
-        }
-
-function execute(ev: Event, topic: string)
+function unsubscribe_multiple(qs: vector of Query, host_list: vector of string, group_list: vector of string)
 	{
-		send_query(topic, ev);
+         for ( i in qs )
+		{
+		# Cancel internal subscription
+		for ( j in subscriptions )
+			{
+	                if ( same_event(subscriptions[j]$query, qs[i]) )
+				# Don't have a delete for vector, so set it to no-op
+	      			# by leaving the event empty.
+				subscriptions[j]$query = [$query=""];
+	                }
 
+		#  Send unsubscribe
+		if (|host_list|<=1 && host_list[0]=="" && |group_list|<=1 && group_list[0]=="")
+			{
+			# To all if nothing specified
+			send_unsubscribe(HostBroadcastTopic, qs[i]);
+			}
+		else
+			{
+			# To specific host
+			for (j in host_list)
+				if (host_list[j] != "")
+					send_unsubscribe(fmt("%s/%s",HostIndividualTopic,host_list[j]), qs[i]);
+			# To specific group
+			for (j in group_list)
+				if (group_list[j] != "")
+					send_unsubscribe(fmt("%s/%s",HostGroupTopic,group_list[j]), qs[i]);
+			}
+		}
         }
 
-function execute_multiple(evs: vector of Event, topic: string)
+function execute(q: Query, host: string, group: string)
 	{
-	for ( i in evs )
-		execute(evs[i], topic);
+	local qs: vector of Query = {q};
+	local host_list: vector of string = {host};
+	local group_list: vector of string = {group};
+	execute_multiple(qs, host_list, group_list);
+        }
+
+function execute_multiple(qs: vector of Query, host_list: vector of string, group_list: vector of string)
+	{
+	for ( i in qs )
+		{
+		if (|host_list|<=1 && host_list[0]=="" && |group_list|<=1 && group_list[0]=="")
+			{
+			# To all if nothing specified
+			send_execute(HostBroadcastTopic, qs[i]);
+			}
+		else
+			{
+			# To specific host
+			for (j in host_list)
+				if (host_list[j] != "")
+					send_execute(fmt("%s/%s",HostIndividualTopic,host_list[j]), qs[i]);
+			# To specific group
+			for (j in group_list)
+				if (group_list[j] != "")
+					send_execute(fmt("%s/%s",HostGroupTopic,group_list[j]), qs[i]);
+			}
+		}
+	}
+
+function set_host_group(range: subnet, group: string)
+	{
+	# Include new Collection in the vector
+        collections[|collections|] = [$group=group, $ranges=vector(range)];
+
+	for (host in hosts )
+		{
+		local host_topic = fmt("%s/%s",HostIndividualTopic,host);
+		local skip_host = F;
+		for (i in host_addresses[host])
+			{
+			local address = host_addresses[host][i];
+			if (address in range)
+				{
+				local new_group = group;
+				log_host("info", host, fmt("joining new group %s", new_group));
+				send_join( host_topic, new_group );
+				host_groups[host][|host_groups[host]|] = group;
+				add groups[group];
+				skip_host = T;
+				break;
+				}
+			}
+			if (skip_host)
+				break;
+		}
 	}
 
 
@@ -512,43 +681,46 @@ event host_error(peer_name: string, msg: string)
 ### Host Tracking
 ###
 
-event osquery::host_new(client_id: string, group_list: vector of string, addr_list: vector of addr)
+event osquery::host_new(host_id: string, group_list: vector of string, addr_list: vector of addr)
 	{
-	#print fmt("New Host Annoucement from client: %s", client_id);
-	log_local("info", fmt("Received new announce message with uid %s", client_id));
-	log_peer("info", client_id, "New osquery host announcement");
+	log_local("info", fmt("Received new announce message with uid %s", host_id));
+	log_peer("info", host_id, "New osquery host announcement");
 
 	# Internal client tracking
-	add hosts[client_id];
-	host_addresses[client_id] = addr_list;
+	add hosts[host_id];
+	host_addresses[host_id] = addr_list;
 	for (i in group_list)
 		add groups[group_list[i]];
-	host_groups[client_id] = group_list;
+	host_groups[host_id] = group_list;
+	host_groups[host_id][|host_groups[host_id]|] = HostIndividualTopic;
 
-	# Host individual topic
-	#local host_topic = fmt("%s/%s", HostIndividualTopic, client_id);
+	# Host individual topic (not used)
+	local host_topic = fmt("%s/%s", HostIndividualTopic, host_id);
 
-	#Broker::subscribe_to_events(host_topic);
-	send_subscriptions(client_id);
+	# Make host to join group and to schedule queries
+	send_collections(host_id);
+	send_subscriptions(host_id);
+
+	send_test(host_topic);
 	}
 
 #TODO: Handle peer_name and client_id
 event Broker::incoming_connection_established(peer_name: string)
 	{
-	#print fmt("Incoming connection from peer: %s", peer_name);
 	log_peer("info", peer_name, "incoming connection established");
 	}
 
 event Broker::incoming_connection_broken(peer_name: string)
 	{
-	#print fmt("Connection broken to peer: %s", peer_name);
 	log_peer("info", peer_name, "incoming connection broken");
 
 	# Internal client tracking
 	delete hosts[peer_name];
 	delete host_addresses[peer_name];
 
+	# Check if anyone else is left in the groups
 	local others_groups: set[string];
+	# Collect set of groups others are in
 	for (i in host_groups)
 		{
 		if ( i != peer_name ) {
@@ -557,6 +729,7 @@ event Broker::incoming_connection_broken(peer_name: string)
 				}
 			}
 		}
+	# Remove group if no one else has the group
 	for (k in host_groups[peer_name])
 		{
 		local host_g: string = host_groups[peer_name][k];

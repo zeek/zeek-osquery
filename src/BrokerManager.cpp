@@ -41,36 +41,46 @@ namespace osquery {
             return this->nodeID;
         }
 
-        // Try to derive from all MACs
-        QueryData mac_results;
-        auto status_if = osquery::queryExternal("SELECT mac from interface_details", mac_results);
-        if (!status_if.ok()) {
-            // Random ID is MAC info is not available
-            LOG(ERROR) << status_if.getMessage();
-            LOG(ERROR) << "Generating random temporary ID instead";
-            // Generate Random ID
-            if (this->nodeID == "") {
-                const char alphanum[] =
-                        "0123456789"
-                                "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-                std::stringstream ss;
-                for (int i = 0; i < 64; ++i)
-                    ss << alphanum[rand() % (sizeof(alphanum) - 1)];
-                this->nodeID = ss.str();
-            }
-        } else {
-            // Hash all MACs
-            std::hash <std::string> hash_fn;
-            std::stringstream macs;
-            for (const auto &row: mac_results) {
-                macs << row.at("mac");
-            }
-            size_t str_hash = hash_fn(macs.str());
 
-            // Convert to Hex String
-            std::stringstream hs;
-            hs << std::hex << str_hash;
-            this->nodeID = hs.str();
+        // Retrieve the hardware uuid from osquery
+        std::string ident;
+        auto status_huuid = getHostUUID(ident);
+        if (status_huuid.ok()) {
+            this->nodeID = ident;
+        } else {
+            LOG(ERROR) << status_huuid.getMessage();
+            LOG(ERROR) << "Generating ID from MAC instead";
+            // Try to derive from all MACs
+            QueryData mac_results;
+            auto status_if = osquery::queryExternal("SELECT mac from interface_details", mac_results);
+            if (status_if.ok()) {
+                // Hash all MACs
+                std::hash <std::string> hash_fn;
+                std::stringstream macs;
+                for (const auto &row: mac_results) {
+                    macs << row.at("mac");
+                }
+                size_t str_hash = hash_fn(macs.str());
+
+                // Convert to Hex String
+                std::stringstream hs;
+                hs << std::hex << str_hash;
+                this->nodeID = hs.str();
+            } else {
+                // Random ID if MAC info is not available
+                LOG(ERROR) << status_if.getMessage();
+                LOG(ERROR) << "Generating random temporary ID instead";
+                // Generate Random ID
+                if (this->nodeID == "") {
+                    const char alphanum[] =
+                            "0123456789"
+                                    "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                    std::stringstream ss;
+                    for (int i = 0; i < 64; ++i)
+                        ss << alphanum[rand() % (sizeof(alphanum) - 1)];
+                    this->nodeID = ss.str();
+                }
+            }
         }
 
         LOG(INFO) << "New Node ID: " << this->nodeID;
@@ -80,6 +90,22 @@ namespace osquery {
     osquery::Status BrokerManager::addGroup(const std::string &group) {
         this->groups.push_back(group);
         return this->createMessageQueue(this->TOPIC_PRE_GROUPS + group);
+    }
+
+    osquery::Status BrokerManager::removeGroup(const std::string &group) {
+        auto element_pos = std::find(this->groups.begin(), this->groups.end(), group);
+        // Group exists?
+        if( element_pos != this->groups.end() ) {
+            // Delete Group
+            this->groups.erase(element_pos);
+            // Delete message queue (maybe)
+            if( std::find(this->groups.begin(), this->groups.end(), group) == this->groups.end() ) {
+                return this->deleteMessageQueue(this->TOPIC_PRE_GROUPS + group);
+            } else {
+                return Status(0,"More subscriptions for group exist");
+            }
+        }
+        return Status(1,"Group does not exist");
     }
 
     std::vector <std::string> BrokerManager::getGroups() {
@@ -103,8 +129,8 @@ namespace osquery {
         return this->ep;
     }
 
-    Status BrokerManager::createMessageQueue(std::string topic) {
-        if (this->messageQueues.find(topic) == this->messageQueues.end()) {
+    Status BrokerManager::createMessageQueue(const std::string& topic) {
+        if (this->messageQueues.count(topic) == 0) {
             LOG(INFO) << "Creating message queue: " << topic;
             broker::message_queue *mq = new broker::message_queue(topic, *(this->ep));
             this->messageQueues[topic] = mq;
@@ -113,7 +139,17 @@ namespace osquery {
         return Status(1, "Message queue exists for topic");
     }
 
-    broker::message_queue *BrokerManager::getMessageQueue(std::string topic) {
+    Status BrokerManager::deleteMessageQueue(const std::string& topic) {
+        if (this->messageQueues.count(topic) == 0) {
+            return Status(1,"Message queue does not exist");
+        }
+        broker::message_queue *mq = this->messageQueues[topic];
+        delete mq;
+        this->messageQueues.erase(this->messageQueues.find(topic));
+        return Status(0, "OK");
+    }
+
+    broker::message_queue *BrokerManager::getMessageQueue(const std::string& topic) {
         return this->messageQueues.at(topic);
     }
 
@@ -191,10 +227,10 @@ namespace osquery {
         // Rows to be reported
         std::vector <std::tuple<osquery::Row, std::string>> rows;
         for (const auto &row: qli.results.added) {
-            rows.emplace_back(row, "ADDED");
+            rows.emplace_back(row, "ADD");
         }
         for (const auto &row: qli.results.removed) {
-            rows.emplace_back(row, "REMOVED");
+            rows.emplace_back(row, "REMOVE");
         }
         for (const auto &row: qli.snapshot_results) {
             rows.emplace_back(row, "SNAPSHOT");
@@ -220,7 +256,7 @@ namespace osquery {
 
 
         // Create message for each row
-        bool err = false;
+        bool parse_err = false;
         for (const auto &element: rows) {
             // Get row and trigger
             osquery::Row row = std::get<0>(element);
@@ -229,8 +265,12 @@ namespace osquery {
             // Set event name, uid and trigger
             broker::message msg;
             msg.push_back(event_name);
-            msg.push_back(uid);
-            msg.push_back(trigger);
+            broker::record result_info({
+                broker::record::field(broker::data( uid )),
+                broker::record::field(broker::data( broker::enum_value{"osquery::" + trigger} )),
+                broker::record::field(broker::data( this->qm->getEventCookie(queryID)) )
+                                       });
+            msg.push_back(result_info);
 
             // Format each column
             for (std::tuple <std::string, ColumnType, ColumnOptions> t: columns) {
@@ -240,7 +280,7 @@ namespace osquery {
                     for (const auto& pair: row) {
                         LOG(ERROR) << "\t<" << pair.first << ", " << pair.second << "> ";
                     }
-                    err = true;
+                    parse_err = true;
                     break;
                 }
                 std::string value = row.at(colName);
@@ -286,7 +326,7 @@ namespace osquery {
             this->sendEvent(topic, msg);
         }
 
-        if ( err ) {
+        if ( parse_err ) {
             printQueryLogItem(qli);
         }
 

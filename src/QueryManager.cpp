@@ -33,6 +33,7 @@ namespace osquery {
     Status
     QueryManager::addQueryEntry(const std::string &queryID, const SubscriptionRequest &qr, const std::string& qtype) {
         std::string query = qr.query;
+        std::string cookie = qr.cookie;
         std::string response_event = qr.response_event;
         std::string response_topic = qr.response_topic;
         int interval = qr.interval;
@@ -52,6 +53,7 @@ namespace osquery {
             this->oneTimeQueries[queryID] = OneTimeQueryEntry{queryID, query};
         else
             LOG(ERROR) << "Unknown query type :" << qtype;
+        this->eventCookies[queryID] = cookie;
         this->eventNames[queryID] = response_event;
         this->eventTopics[queryID] = response_topic;
         return Status(0, "OK");
@@ -101,12 +103,14 @@ namespace osquery {
         }
 
         // Delete query info
+        this->eventCookies.erase(queryID);
         this->eventTopics.erase(queryID);
         this->eventNames.erase(queryID);
-        if (this->scheduleQueries.find(queryID) != this->scheduleQueries.end()) {
+        if (this->scheduleQueries.count(queryID) >= 1) {
             LOG(INFO) << "Deleting schedule query '" << query << "' with queryID '" << queryID << "'";
             this->scheduleQueries.erase(queryID);
-        } else if (this->oneTimeQueries.find(queryID) != this->oneTimeQueries.end()) {
+        }
+        if (this->oneTimeQueries.count(queryID) >= 1) {
             LOG(INFO) << "Deleting onetime query '" << query << "' with queryID '" << queryID << "'";
             this->oneTimeQueries.erase(queryID);
         }
@@ -138,6 +142,10 @@ namespace osquery {
         std::string config = std::string("{\"schedule\": {") + queries + std::string("} }");
 
         return config;
+    }
+
+    std::string QueryManager::getEventCookie(const std::string& queryID){
+        return this->eventCookies.at(queryID);
     }
 
     std::string QueryManager::getEventName(const std::string& queryID){
