@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install apt-utils -y && apt-get upgrade -y && apt-
 RUN adduser --disabled-password --gecos '' osquery
 RUN usermod -aG sudo osquery
 RUN echo "osquery       ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/local-lib.conf && ldconfig
 
 # Download install and run script
 WORKDIR /home/osquery/
@@ -24,5 +25,9 @@ RUN sudo chown osquery:root /usr/local/osquery
 WORKDIR /home/osquery/
 # Execute install script
 RUN /bin/bash -c './install_ubuntu_16_04.sh'
+
+# Tell ld where to find libbroker
+RUN sudo 
+
 # Set run script
 CMD /bin/bash -c './run.sh'
