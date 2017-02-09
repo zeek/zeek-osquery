@@ -12,7 +12,7 @@ Download the `Dockerfile` within this install folder. Use your shell and go to t
 Afterwards, you need to configure the bro-osquery extension. Most importantly, you have to set the IP address of the bro instance you want to connect to:
 	
 	docker run -it --name bro-osquery bro/bro-osquery:latest /bin/bash
-	vim /etc/osquery/osquery.conf
+	sudo vim /etc/osquery/osquery.conf
 	
 Finally, run osquery and the bro-osquery extension
 

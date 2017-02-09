@@ -25,9 +25,5 @@ RUN sudo chown osquery:root /usr/local/osquery
 WORKDIR /home/osquery/
 # Execute install script
 RUN /bin/bash -c './install_ubuntu_16_04.sh'
-
-# Tell ld where to find libbroker
-RUN sudo 
-
 # Set run script
 CMD /bin/bash -c './run.sh'
