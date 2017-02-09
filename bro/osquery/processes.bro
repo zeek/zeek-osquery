@@ -23,17 +23,17 @@ export {
         };
 }
 
-event host_processes(host: string, utype: string,
+event host_processes(resultInfo: osquery::ResultInfo,
 		pid: int, name: string, path: string, cmdline: string, cwd: string, root: string, uid: int, gid: int, on_disk: int, 
 		start_time: int, parent: int, pgroup: int)
         {
-        if ( utype != "ADDED" )
-                # Just want to log process existance.
+        if ( resultInfo$utype != osquery::ADD )
+                # Just want to log new process existance.
                 return;
 
         local info: Info = [
 		$t=network_time(),
-		$host=host,
+		$host=resultInfo$host,
                	$pid = pid,
                 $name = name,
                 $path = path,
@@ -48,7 +48,6 @@ event host_processes(host: string, utype: string,
                 $pgroup = pgroup
         ];
 
-	#print fmt("Writing process with PID '%d' and name '%s'", pid, name);
         Log::write(LOG, info);
         }
 
@@ -58,6 +57,6 @@ event bro_init()
 
 	Broker::enable();
 
-        local ev = [$ev=host_processes,$query="SELECT pid,name,path,cmdline,cwd,root,uid,gid,on_disk,start_time,parent,pgroup FROM processes"];
-        osquery::subscribe(ev);
+        local query = [$ev=host_processes,$query="SELECT pid,name,path,cmdline,cwd,root,uid,gid,on_disk,start_time,parent,pgroup FROM processes"];
+        osquery::subscribe(query);
         }

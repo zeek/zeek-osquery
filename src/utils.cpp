@@ -18,12 +18,12 @@ namespace osquery {
 
         //Check number of fields
         unsigned long numFields;
-        if ( rType == "QUERY" )
-            numFields = 5;
+        if ( rType == "EXECUTE" )
+            numFields = 6;
         else if ( rType == "SUBSCRIBE" )
-            numFields = 6;
+            numFields = 7;
         else if ( rType == "UNSUBSCRIBE" )
-            numFields = 6;
+            numFields = 7;
         else {
             LOG(WARNING) << "Unknown Request Type: '" << rType << "'";
             return Status(1, "Failed to create Subscription Request");
@@ -52,14 +52,18 @@ namespace osquery {
             return Status(1, "Failed to create Subscription Request");
         }
 
+        // Cookie
+        std::string cookie = broker::to_string(msg[3]);
+        sr.cookie = cookie;
+
         // Response Topic
-        if( broker::to_string(msg[3]).empty() ) {
+        if( broker::to_string(msg[4]).empty() ) {
             sr.response_topic = incoming_topic;
             LOG(WARNING) << "No response topic given for event '" << sr.response_event << "'. Reporting back to "
                     "incoming topic '" << incoming_topic << "'";
         } else {
-            if ( broker::is<std::string>(msg[3]) )
-                sr.response_topic = *broker::get<std::string>(msg[3]);
+            if ( broker::is<std::string>(msg[4]) )
+                sr.response_topic = *broker::get<std::string>(msg[4]);
             else {
                 LOG(WARNING) << "Unexpected data type";
                 return Status(1, "Failed to create Subscription Request");
@@ -67,7 +71,7 @@ namespace osquery {
         }
 
         // Update Type
-        std::string update_type = broker::to_string(msg[4]);
+        std::string update_type = broker::to_string(msg[5]);
         if (update_type == "ADDED") {
             sr.added = true; sr.removed = false; sr.snapshot = false;
         } else if (update_type == "REMOVED") {
@@ -82,7 +86,7 @@ namespace osquery {
         }
 
         // If one-time query
-        if ( rType == "QUERY" ) {
+        if ( rType == "EXECUTE" ) {
             if (sr.added or sr.removed or !sr.snapshot) {
                 LOG(WARNING) << "Only possible to query SNAPSHOT for one-time queries";
             }
@@ -94,8 +98,8 @@ namespace osquery {
         }
 
         // Interval
-        if ( broker::is<uint64_t>(msg[5]) )
-            sr.interval = *broker::get<uint64_t>(msg[5]);
+        if ( broker::is<uint64_t>(msg[6]) )
+            sr.interval = *broker::get<uint64_t>(msg[6]);
         else {
             LOG(WARNING) << "Unexpected data type";
             return Status(1, "Failed to create Subscription Request");

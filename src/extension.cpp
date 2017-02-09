@@ -130,11 +130,11 @@ int main(int argc, char *argv[]) {
                     std::string eventName = *broker::get<std::string>(msg[0]);
                     LOG(INFO) << "Received event '" << eventName << "' on topic '" << topic << "'";
 
-                    // osquery::host_query
-                    if (eventName == bm->EVENT_HOST_QUERY) {
+                    // osquery::host_execute
+                    if (eventName == bm->EVENT_HOST_EXECUTE) {
                         // One-Time Query Execution
                         SubscriptionRequest sr;
-                        createSubscriptionRequest("QUERY", msg, topic, sr);
+                        createSubscriptionRequest("EXECUTE", msg, topic, sr);
                         std::string newQID = qm->addOneTimeQueryEntry(sr);
                         if (newQID == "-1") {
                             LOG(ERROR) << "Unable to add Broker Query Entry";
@@ -181,6 +181,18 @@ int main(int argc, char *argv[]) {
 
                         continue;
 
+                    // osquery::host_join
+                    } else if (eventName == bm->EVENT_HOST_JOIN) {
+                        std::string newGroup = *broker::get<std::string>(msg[1]);
+                        bm->addGroup(newGroup);
+                        continue;
+
+                    // osquery::host_leave
+                    } else if (eventName == bm->EVENT_HOST_LEAVE) {
+                        std::string newGroup = *broker::get<std::string>(msg[1]);
+                        bm->removeGroup(newGroup);
+                        continue;
+
                     // osquery::host_subscribe
                     } else if (eventName == bm->EVENT_HOST_SUBSCRIBE) {
                         // New SQL Query Request
@@ -198,10 +210,13 @@ int main(int argc, char *argv[]) {
 
                         qm->removeQueryEntry(query);
 
+                    } else if (eventName == "osquery::host_test") {
+
+
                     } else {
                         // Unkown Message
-                        //LOG(ERROR) << "Unknown Event Name: '" << eventName << "'";
-                        //LOG(ERROR) << "\t" << broker::to_string(msg);
+                        LOG(ERROR) << "Unknown Event Name: '" << eventName << "'";
+                        LOG(ERROR) << "\t" << broker::to_string(msg);
                         continue;
                     }
 

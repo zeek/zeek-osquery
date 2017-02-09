@@ -18,17 +18,17 @@ export {
 	};
 }
 
-event host_mounts(host: string, utype: string,
+event host_mounts(resultInfo: osquery::ResultInfo,
 		device: string, device_alias: string, path: string, typ: string,
 		blocks_size: int, blocks: int, flags: string)
 	{
-	if ( utype != "ADDED" )
-		# Just want to log mount existance.
+	if ( resultInfo$utype != osquery::ADD )
+		# Just want to log new mount existance.
 		return;
 	
 	local info: Info = [
-			                $t=network_time(),
-			                $host=host,
+			 $t=network_time(),
+			 $host=resultInfo$host,
                       $device = device,
                       $device_alias = device_alias,
                       $path = path,
@@ -38,7 +38,6 @@ event host_mounts(host: string, utype: string,
                       $flags = flags
 			               ];
 	
-	#print fmt("Writing mount with device '%s' and device_alias '%s' mounted to path '%s'", device, device_alias, path);
 	Log::write(LOG, info);
 	}
 
