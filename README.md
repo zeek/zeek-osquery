@@ -1,6 +1,23 @@
 # The Bro-Osquery Project#
 This extension adds a Bro interface to the host monitor [osquery](https://osquery.io), enabling the network monitor [Bro](https://www.bro.org) to subscribe to changes from hosts as a continous stream of events. The extension is controlled from Bro scripts, which sends SQL-style queries to the hosts and then begins listening for any updates coming back. Host events are handled by Bro scripts the same way as network events.
 
+Here, you see an example script to be loaded by Bro, using osquery and our bro-osuqery framework to make hosts report about server applications as soon as it starts.
+```
+event host_server_apps(resultInfo: osquery::ResultInfo,
+	        username: string, name: string, port_number: int)
+	{
+	print fmt("[Host %s] User '%s' is running server application '%s' on port %d", resultInfo$host, username, name, port_number);
+	}
+
+event bro_init()
+	{
+	Broker::enable();
+
+	local query = [$ev=host_server_apps, $query="SELECT u.username, p.name, l.port from listening_ports l, users u, processes p WHERE l.pid=p.pid AND p.uid=u.uid and l.address NOT IN ('127.0.0.1', '::1')"];
+	osquery::subscribe(query);
+	}
+```
+
 ## Overview ##
 Bro-Osquery is a platform for infrastructure monitoring, combining network and host monitoring. Bro is used to capture, log and analyze network packets. To retrieve information of hosts in the network, there is the osquery agent running on hosts. Osquery can be instrumented by Bro to send information about software and hardware changes.
 
