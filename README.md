@@ -26,14 +26,14 @@ Both types of events, from network and hosts, are transparently handled with Bro
 ## Installation ##
 For the Bro-Osquery Project to run, you need to deploy osquery on respective hosts to be monitored. Additionally, Bro has to be loaded with the osquery framework script to enable the communication with the hosts.
 
-**Bro Script Framework** can be found in this Github repository at path [bro/osquery](https://github.com/bro/bro-osquery/tree/master/bro/osquery). To make the scripts available in Bro, either copy/link this folder into *$PREFIX/share/bro/site* (see [Bro manual](https://www.bro.org/sphinx/quickstart/index.html#bro-scripts)) or make the environment variable BROPATH to point to the framework folder (see [Bro manual](https://www.bro.org/sphinx/quickstart/index.html#telling-bro-which-scripts-to-load). Once you placed the osquery framework, start Bro with the scripts, e.g.:
+**Bro Script Framework** can be found in this Github repository at path [bro/osquery](https://github.com/bro/bro-osquery/tree/master/bro/osquery). To make the scripts available in Bro, either copy/link this folder into *$PREFIX/share/bro/site* (see [Bro manual](https://www.bro.org/sphinx/quickstart/index.html#bro-scripts)) or make the environment variable BROPATH to point to the framework folder (see [Bro manual](https://www.bro.org/sphinx/quickstart/index.html#telling-bro-which-scripts-to-load)). Once you placed the osquery framework, start Bro with the scripts, e.g.:
 
 	bro -i eth0 osquery
 
 **Osquery** is originally a standalone host monitor. We are currently integrating our project into osquery. The latest version of this integration branch is also available as a [Github repository](https://github.com/iBigQ/osquery/tree/bro_integration). While we are working on integration, you can check out this version.
 
 	git clone https://github.com/iBigQ/osquery.git
-	cd osquery && git checkout -b bro_integration
+	cd osquery && git checkout bro_integration
 	make deps && make
 	sudo make install
 	
