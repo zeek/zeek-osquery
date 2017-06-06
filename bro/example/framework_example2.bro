@@ -22,14 +22,14 @@ export {
 
 global http_agent: string;
 
-event host_browser(client_id: string, utype: string,
+event host_browser(resultInfo: osquery::ResultInfo,
                 name: string, username: string)
         {
 	#print fmt("User %s is running %s as browser", username, name);
 
 	local info: Info = [
                 $t=network_time(),
-                $host=client_id,
+                $host=resultInfo$host,
 		$username=username,
 		$name=name,
 		$agent=http_agent

@@ -24,13 +24,15 @@ Bro-Osquery is a platform for infrastructure monitoring, combining network and h
 Both types of events, from network and hosts, are transparently handled with Bro scripts. We provide an easy to use interface in Bro to manage groups of hosts and to subscribe to host status changes.
 
 ## Installation ##
-For the Bro-Osquery Project to run, you need to deploy osquery on respective hosts to be monitored. Additionally, Bro has to be loaded with the osquery framework script to enable the communication with the hosts.
+For the Bro-Osquery Project to run, you need to deploy **Osquery** on respective hosts to be monitored. Additionally, **Bro** has to be loaded with the **osquery framework script** to enable the communication with the hosts.
 
-**Bro Script Framework** can be found in this Github repository at path [bro/osquery](https://github.com/bro/bro-osquery/tree/master/bro/osquery). To make the scripts available in Bro, either copy/link this folder into *$PREFIX/share/bro/site* (see [Bro manual](https://www.bro.org/sphinx/quickstart/index.html#bro-scripts)) or make the environment variable BROPATH to point to the framework folder (see [Bro manual](https://www.bro.org/sphinx/quickstart/index.html#telling-bro-which-scripts-to-load)). Once you placed the osquery framework, start Bro with the scripts, e.g.:
+**Bro** needs to be installed from source, because the binary packages do not include the broker communication library. Please install the [caf library](https://github.com/actor-framework/actor-framework/) version 0.14.6 and the [broker library](https://github.com/bro/broker/) version 0.6. Then follow the instructions on [Bro.org](https://www.bro.org/sphinx/install/install.html) and include broker using `./configure --enable-broker`. 
+
+Now add the **Bro Script Framework** to your bro installation. It can be found in this Github repository at path [bro/osquery](https://github.com/bro/bro-osquery/tree/master/bro/osquery). To make the scripts available in Bro, either copy/link this folder into *$PREFIX/share/bro/site* (see [Bro manual](https://www.bro.org/sphinx/quickstart/index.html#bro-scripts)) or make the environment variable BROPATH to point to the framework folder (see [Bro manual](https://www.bro.org/sphinx/quickstart/index.html#telling-bro-which-scripts-to-load)). Once you placed the osquery framework, start Bro with the scripts, e.g.:
 
 	bro -i eth0 osquery
 
-**Osquery** is originally a standalone host monitor. We are currently integrating our project into osquery. The latest version of this integration branch is also available as a [Github repository](https://github.com/iBigQ/osquery/tree/bro_integration). While we are working on integration, you can check out this version.
+**Osquery** is originally a standalone host monitor. We are currently integrating our project into the osquery code. This enables osquery to communicate with bro without any additional modifications. The latest version of this integration branch is also available as a [Github repository](https://github.com/iBigQ/osquery/tree/bro_integration). While we are working on integration, you can check out this development version.
 
 	git clone https://github.com/iBigQ/osquery.git
 	cd osquery && git checkout bro_integration
@@ -39,7 +41,7 @@ For the Bro-Osquery Project to run, you need to deploy osquery on respective hos
 	
 After installation, you can start the osquery daemon and the bro extension:
 
-	sudo osqueryd --verbose --logger_plugin bro --config_plugin filesystem --log_result_events=0 --disable-bro=false --bro-ip="172.17.0.2"
+	sudo osqueryd --verbose --disable-distributed=false --distributed_interval=0 --distributed_plugin bro --bro-ip="172.17.0.2" --logger_plugin bro --log_result_events=0 --config_plugin update
 
 Please make sure that the *bro-ip* matches the Bro installation running the osquery framework.
 
