@@ -161,6 +161,21 @@ export {
 #	global set_host_group_multiple: function(range_list: vector of subnet, group_list: vector of string);
 
 ###
+### Events emitted by this framework
+###
+
+	## Event that signals the connection of a new osquery host
+	##
+	## client_id: An id that uniquely identifies an osquery host 
+        global host_connected: event (host_id: string);
+
+	## Event that signals the disconnection of an osquery host
+	##
+	## client_id: An id that uniquely identifies an osquery host 
+        global host_disconnected: event (host_id: string);
+
+
+###
 ### Events from Clients
 ###
 
@@ -701,7 +716,11 @@ event osquery::host_new(host_id: string, group_list: vector of string, addr_list
 	send_collections(host_id);
 	send_subscriptions(host_id);
 
+	# raise event for new host
+	event osquery::host_connected(host_id);
+
 	send_test(host_topic);
+
 	}
 
 #TODO: Handle peer_name and client_id
@@ -739,4 +758,7 @@ event Broker::incoming_connection_broken(peer_name: string)
 			}
 		}
 	delete host_groups[peer_name];
+
+	# raise event for the disconnected host
+	event osquery::host_disconnected(peer_name);
 	}
