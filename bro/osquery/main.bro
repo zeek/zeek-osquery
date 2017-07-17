@@ -1,6 +1,8 @@
 @load base/frameworks/broker
 @load base/frameworks/logging
 
+@load ./utils/host_interfaces
+
 const broker_port: port = 9999/tcp &redef;
 redef Broker::endpoint_name = "Bro";
 
@@ -164,6 +166,16 @@ export {
     global set_host_group: function(range: subnet, group: string);
 
 ###
+### Functions to update the framework
+###
+
+    ##
+    global send_joins_new_address: function(host_id: string, ip: addr): vector of string;
+
+    ##
+    global send_subscriptions_new_group: function(host_id: string, group: string);
+
+###
 ### Events emitted by this framework
 ###
 
@@ -186,8 +198,7 @@ export {
 ## Event that signals the connection of a new osquery host
 ##
 ## client_id: An id that uniquely identifies an osquery host
-## addr_list: A list of IP addresses of that osquery host
-global host_new: event (host_id: string, group_list: vector of string, addr_list: vector of addr);
+global host_new: event (host_id: string, group_list: vector of string);
 
 # Event sent by clients to report an error.
 #
@@ -237,9 +248,6 @@ global subscriptions: vector of Subscription;
 # Internal set for tracing client ids
 global hosts: set[string];
 
-# Internal table for tracking client (ids) and their respective addresses
-global host_addresses: table[string] of vector of addr;
-
 # Internal record for tracking dynamic groups
 type Collection: record {
     group: string;
@@ -261,6 +269,34 @@ global host_groups: table[string] of vector of string;
 # Implementation              #
 #                             #
 ###############################
+
+##
+## Helper
+##
+
+function same_event(q1: Query, q2: Query) : bool
+{
+    if ( q1$query!=q2$query  )
+        return F;
+    if ( (q1?$ev!=q2?$ev) )
+        return F;
+    if ( q1?$ev && fmt("%s", q1$ev)!=fmt("%s", q2$ev) )
+        return F;
+    if ( (q1?$utype!=q2?$utype) )
+        return F;
+    if ( q1?$utype && q1$utype!=q2$utype )
+        return F;
+    if ( (q1?$resT!=q2?$resT) )
+        return F;
+    if ( q1?$resT && q1$resT!=q2$resT )
+        return F;
+    if ( (q1?$inter!=q2?$inter) )
+        return F;
+    if ( q1?$inter && q1$inter!=q2$inter )
+        return F;
+
+    return T;
+}
 
 ###
 ### Logging
@@ -306,7 +342,7 @@ function log_local(level: string, msg: string)
 }
 
 ###
-### Subscription Sending
+### Sending Events (Subscriptions, Executions and Joins)
 ###
 
 ## Sends the interest given by ev to the client
@@ -319,7 +355,7 @@ function send_subscribe(topic: string, query: Query)
     local host_topic = topic;
 
     log_peer("info", "osquery", fmt("%s event %s() with '%s'", "subscribing to", ev_name, query$query));
-    #print fmt("%s event %s() with '%s'", "subscribing to", ev_name, query$query);
+    print fmt("%s event %s() with '%s'", "subscribing to", ev_name, query$query);
 
     local update_type = "BOTH";
     if ( query$utype == ADD )
@@ -372,31 +408,6 @@ function send_unsubscribe(topic: string, query: Query)
     Broker::send_event(host_topic, ev_args);
 }
 
-function same_event(q1: Query, q2: Query) : bool
-{
-    if ( q1$query!=q2$query  )
-        return F;
-    if ( (q1?$ev!=q2?$ev) )
-        return F;
-    if ( q1?$ev && fmt("%s", q1$ev)!=fmt("%s", q2$ev) )
-        return F;
-    if ( (q1?$utype!=q2?$utype) )
-        return F;
-    if ( q1?$utype && q1$utype!=q2$utype )
-        return F;
-    if ( (q1?$resT!=q2?$resT) )
-        return F;
-    if ( q1?$resT && q1$resT!=q2$resT )
-        return F;
-    if ( (q1?$inter!=q2?$inter) )
-        return F;
-    if ( q1?$inter && q1$inter!=q2$inter )
-        return F;
-
-    return T;
-}
-
-
 function send_execute(topic: string, q: Query)
 {
     local ev_name = split_string(fmt("%s", q$ev), /\n/)[0];
@@ -416,12 +427,33 @@ function send_execute(topic: string, q: Query)
     Broker::send_event(host_topic, ev_args);
 }
 
+function send_join(host_topic: string, group: string)
+{
+    local ev_args = Broker::event_args(host_join, group);
+    Broker::send_event(host_topic, ev_args);
+}
 
-## Sends current subscriptions to the osquery host (given by client_id)
-## if the subscription topic filter matches at least one of the hosts groups.
+
+###############################
+#                             #
+# Subscription Management     #
+#                             #
+###############################
+###
+### The framework keeps track of subscriptions and clients to match them.
+### We need functions whenever subscription or clients change.
+###
+
+##
+## Evaluating to send events to new hosts (Subscriptions, Executions and Joins)
+##
+
+## Sends current subscriptions to the new osquery host (given by client_id).
+##
+## This checks if any subscription matches the host restriction (or broadcast)
 ##
 ## client_id: The client ID
-function send_subscriptions(host_id: string)
+function send_subscriptions_new_host(host_id: string)
 {
     local host_topic = fmt("%s/%s", HostIndividualTopic, host_id);
     for ( i in subscriptions )
@@ -435,7 +467,19 @@ function send_subscriptions(host_id: string)
             next;
         }
 
+        # Check for broadcast
         local sub_hosts: vector of string = s$hosts;
+        local sub_groups: vector of string = s$groups;
+        if (|sub_hosts|<=1 && sub_hosts[0]=="" && |sub_groups|<=1 && sub_groups[0]=="")
+        {
+            # To all if nothing specified
+            send_subscribe(host_topic, s$query);
+            skip_subscription = T;
+        }
+        if (skip_subscription)
+            next;
+
+        # Check the hosts in the Subscriptions
         for ( j in sub_hosts )
         {
             local sub_host = sub_hosts[j];
@@ -449,14 +493,14 @@ function send_subscriptions(host_id: string)
         if (skip_subscription)
             next;
 
-        local sub_groups: vector of string = s$groups;
+        # Check the groups in the Subscriptions
         for ( j in host_groups[host_id] )
         {
             local host_group = host_groups[host_id][j];
             for ( k in sub_groups )
             {
                 local sub_group = sub_groups[k];
-                if ( |host_group| <= |sub_group| && host_group == sub_group[:|host_group|]);
+                if ( |host_group| <= |sub_group| && host_group == sub_group[:|host_group|])
                 {
                     send_subscribe(host_topic, s$query);
                     skip_subscription = T;
@@ -471,19 +515,54 @@ function send_subscriptions(host_id: string)
     }
 }
 
-function send_join(host_topic: string, group: string)
+
+## Checks for subscriptions that match the recently joined group
+##
+##
+##
+function send_subscriptions_new_group(host_id: string, group: string)
 {
-    local ev_args = Broker::event_args(host_join, group);
-    Broker::send_event(host_topic, ev_args);
+    local host_topic = fmt("%s/%s", HostIndividualTopic, host_id);
+    for ( i in subscriptions )
+    {
+        local s = subscriptions[i];
+
+        if ( ! s$query?$ev )
+        {
+            # Skip Subscription because it was deleted";
+            next;
+        }
+
+        # Check the groups in the Subscriptions
+        local sub_groups: vector of string = s$groups;
+        for ( k in sub_groups )
+        {
+            local sub_group = sub_groups[k];
+            if (group == sub_group)
+            {
+                if ( |group| <= |sub_group| && group == sub_group[:|group|])
+                {
+                    send_subscribe(host_topic, s$query);
+                    break;
+                }
+            }
+        }
+
+    }
 }
 
-function send_collections(host_id: string)
+## Checks for groups that match the recently added address
+##
+##
+##
+function send_joins_new_address(host_id: string, ip: addr): vector of string
 {
     local host_topic = fmt("%s/%s",HostIndividualTopic,host_id);
+    local new_groups: vector of string;
     for ( i in collections )
     {
         local c = collections[i];
-        local skip_collection = F;
+
 
         if ( c$group=="" )
         {
@@ -491,34 +570,25 @@ function send_collections(host_id: string)
             next;
         }
 
-        for (j in host_addresses[host_id])
+        for (k in c$ranges)
         {
-            local address = host_addresses[host_id][j];
-            for (k in c$ranges)
+            local range = c$ranges[k];
+            if (ip in range)
             {
-                local range = c$ranges[k];
-                if (address in range)
-                {
-                    local new_group: string = c$group;
-                    log_host("info", host_id, fmt("joining new group %s", new_group));
-                    send_join( host_topic, new_group );
-                    host_groups[host_id][|host_groups[host_id]|] = new_group;
-                    add groups[new_group];
-                    skip_collection = T;
-                    break;
-                }
+                local new_group: string = c$group;
+                log_host("info", host_id, fmt("joining new group %s", new_group));
+                send_join( host_topic, new_group );
+                host_groups[host_id][|host_groups[host_id]|] = new_group;
+                new_groups[|new_groups|] = new_group;
+                break;
             }
-            if (skip_collection)
-            break;
         }
     }
+    return new_groups;
 }
 
 ###
-### Subscription Management
-###
-### The framework keeps track of subscriptions and clients to match them.
-### We need functions whenever subscription or clients change.
+### Evaluating to send new events to hosts (Subscriptions, Executions and Joins)
 ###
 
 function subscribe(q: Query, host: string, group: string)
@@ -660,16 +730,18 @@ function set_host_group(range: subnet, group: string)
     {
         local host_topic = fmt("%s/%s",HostIndividualTopic,host);
         local skip_host = F;
-        for (i in host_addresses[host])
+
+        local hostInfo = osquery::host_interfaces::getHostInfoByHostID(host);
+        for (j in hostInfo$interface_info)
         {
-            local address = host_addresses[host][i];
-            if (address in range)
+            local interfaceInfo =  hostInfo$interface_info[j];
+            if (interfaceInfo$ipv4 in range || interfaceInfo$ipv6 in range)
             {
                 local new_group = group;
                 log_host("info", host, fmt("joining new group %s", new_group));
                 send_join( host_topic, new_group );
-                host_groups[host][|host_groups[host]|] = group;
-                add groups[group];
+                host_groups[host][|host_groups[host]|] = new_group;
+                add groups[new_group];
                 skip_host = T;
                 break;
             }
@@ -726,27 +798,26 @@ event host_error(peer_name: string, msg: string)
 ### Host Tracking
 ###
 
-event osquery::host_new(host_id: string, group_list: vector of string, addr_list: vector of addr)
+event osquery::host_new(host_id: string, group_list: vector of string)
 {
     log_local("info", fmt("Received new announce message with uid %s", host_id));
     log_peer("info", host_id, "New osquery host announcement");
 
     # Internal client tracking
     add hosts[host_id];
-    host_addresses[host_id] = addr_list;
     for (i in group_list)
     {
         add groups[group_list[i]];
     }
     host_groups[host_id] = group_list;
+    #TODO: that is only the topic prefix
     host_groups[host_id][|host_groups[host_id]|] = HostIndividualTopic;
 
     # Host individual topic (not used)
     local host_topic = fmt("%s/%s", HostIndividualTopic, host_id);
 
     # Make host to join group and to schedule queries
-    send_collections(host_id);
-    send_subscriptions(host_id);
+    send_subscriptions_new_host(host_id);
 
     # raise event for new host
     event osquery::host_connected(host_id);
@@ -764,7 +835,6 @@ event Broker::incoming_connection_broken(peer_name: string)
 
     # Internal client tracking
     delete hosts[peer_name];
-    delete host_addresses[peer_name];
 
     # Check if anyone else is left in the groups
     local others_groups: set[string];
