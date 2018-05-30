@@ -1,21 +1,21 @@
-# The Bro-Osquery Project#
+# The Bro-Osquery Project #
 This extension adds a Bro interface to the host monitor [osquery](https://osquery.io), enabling the network monitor [Bro](https://www.bro.org) to subscribe to changes from hosts as a continous stream of events. The extension is controlled from Bro scripts, which sends SQL-style queries to the hosts and then begins listening for any updates coming back. Host events are handled by Bro scripts the same way as network events.
 
 Here, you see an example script to be loaded by Bro, using osquery and our bro-osuqery framework to make hosts report about server applications as soon as it starts.
 ```
 event host_server_apps(resultInfo: osquery::ResultInfo,
 	        username: string, name: string, port_number: int)
-	{
-	print fmt("[Host %s] User '%s' is running server application '%s' on port %d", resultInfo$host, username, name, port_number);
-	}
+{
+  print fmt("[Host %s] User '%s' is running server application '%s' on port %d", resultInfo$host, username, name, port_number);
+}
 
 event bro_init()
-	{
-	Broker::enable();
+{
+  Broker::enable();
 
-	local query = [$ev=host_server_apps, $query="SELECT u.username, p.name, l.port from listening_ports l, users u, processes p WHERE l.pid=p.pid AND p.uid=u.uid and l.address NOT IN ('127.0.0.1', '::1')"];
-	osquery::subscribe(query);
-	}
+  local query = [$ev=host_server_apps, $query="SELECT u.username, p.name, l.port from listening_ports l, users u, processes p WHERE l.pid=p.pid AND p.uid=u.uid and l.address NOT IN ('127.0.0.1', '::1')"];
+  osquery::subscribe(query);
+}
 ```
 
 ## Overview ##
@@ -26,23 +26,38 @@ Both types of events, from network and hosts, are transparently handled with Bro
 ## Installation ##
 For the Bro-Osquery Project to run, you need to deploy **Osquery** on respective hosts to be monitored. Additionally, **Bro** has to be loaded with the **osquery framework script** to enable the communication with the hosts.
 
-**Bro** needs to be installed from source, because the binary packages do not include the broker communication library. Please install the [caf library](https://github.com/actor-framework/actor-framework/) version 0.14.6 and the [broker library](https://github.com/bro/broker/) version 0.6. Then follow the instructions on [Bro.org](https://www.bro.org/sphinx/install/install.html) and include broker using `./configure --enable-broker`. 
+**Bro** needs to be installed from source to include development features required by bro-osquery.
+Then, the **Bro Script Framework** needs to be installed.
 
-Now add the **Bro Script Framework** to your bro installation. It can be found in this Github repository at path [bro/osquery](https://github.com/bro/bro-osquery/tree/master/bro/osquery). To make the scripts available in Bro, either copy/link this folder into *$PREFIX/share/bro/site* (see [Bro manual](https://www.bro.org/sphinx/quickstart/index.html#bro-scripts)) or make the environment variable BROPATH to point to the framework folder (see [Bro manual](https://www.bro.org/sphinx/quickstart/index.html#telling-bro-which-scripts-to-load)). Once you placed the osquery framework, start Bro with the scripts, e.g.:
+**Osquery** is originally a standalone host monitor and does not include the Bro plugins yet. Hence, bro-osquery cannot currently be used with the official osquery binaries. Use our customized osquery instead.
 
-	bro -i eth0 osquery
+For detailed installation instructions please refer to the (installation guide)[https://github.com/bro/bro-osquery/install_guide.md].
 
-**Osquery** is originally a standalone host monitor. We are currently integrating our project into the osquery code. This enables osquery to communicate with bro without any additional modifications. The latest version of this integration branch is also available as a [Github repository](https://github.com/iBigQ/osquery/tree/bro_integration). While we are working on integration, you can check out this development version.
+## Deployment ##
 
-	git clone https://github.com/iBigQ/osquery.git
-	cd osquery && git checkout bro_integration
-	make deps && make
-	sudo make install
-	
-After installation, you can start the osquery daemon and the bro extension:
+Once you installed Bro and placed the osquery framework, start Bro with the scripts, e.g.:
 
-	sudo osqueryd --verbose --disable-distributed=false --distributed_interval=0 --distributed_plugin bro --bro-ip="172.17.0.2" --logger_plugin bro --log_result_events=0 --config_plugin update
+	bro -i <interface_name> osquery
+
+or run Bro in background (after enabling the osquery framework):
+
+    broctl deploy
+
+
+Once you installed the bro-featured osquery, you can start daemon and the bro plugins:
+
+	sudo osqueryd --disable-distributed=false --distributed_interval=0 --distributed_plugin bro --bro-ip="<bro-ip>" --logger_plugin bro --log_result_events=0
 
 Please make sure that the *bro-ip* matches the Bro installation running the osquery framework.
 
-As an example, you should be able to see Bro logfiles named osq-processes.log and osq-mounts.log.
+Additional command line flags in osquery that might be useful when running bro-osquery:
+
+      --verbose                Verbose osquery output
+      --config_plugin update   Initial config from commandline only
+      --disable_events=0       Enable event-based tables
+      --disable_audit=0        Enable audit as event publisher (make sure auditd is not running)
+      --audit_persist=1        Persistently controllig audit while running
+      --audit_allow_config=1   More power to control audit
+      --audit_allow_sockets=1  Include socket-related syscalls in audit
+
+Osquery related logfiles are written to the Bro log directory. Depending on the enabled osquery scripts, you should be able to see Bro logfiles named osq-processes.log and osq-mounts.log.
