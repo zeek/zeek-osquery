@@ -26,32 +26,21 @@ You can specify the configuration options required for bro-osquery either on the
 ```json
 {
   "options": {
-    // Enable the distributed service
     "disable_distributed": "false",
-
-    // Set distributed query interval to 0
     "distributed_interval": "0",
-
-    // Select the osquery distributed plugin
     "distributed_plugin": "bro",
 
-    // The IP and port of the Bro endpoint.
     "bro_ip": "192.168.137.1",
     "bro_port": "9999",
 
-    // The static groups of osquery host.
     "bro_groups": {
         "group1": "geo/de/hamburg",
         "group2": "orga/uhh/cs/iss"
     },
 
-    // Select the osquery logging plugin.
     "logger_plugin": "bro",
-
-    // Choose log format to be used
     "log_result_events": "false",
 
-    // Enable all required audit events
     "disable_events": "0",
     "disable_audit": "0",
     "audit_persist": "1",
@@ -63,14 +52,6 @@ You can specify the configuration options required for bro-osquery either on the
 
 ## 2. Bro
 
-### CAF Dependency
-
-```
-git clone --recursive https://github.com/actor-framework/actor-framework -b 0.15.5
-cd actor-framework
-./configure && make && sudo make install
-```
-
 ### Compile Bro and Dependencies
 
 Build Bro from source to include the latest development features, including the new broker version.
@@ -81,7 +62,7 @@ cd bro
 ./configure && make && sudo make install
 ```
 
-### Bro Scripts
+### Osquery Framework
 
 The Bro scripts have to be extended to be able to talk to osquery hosts. Please find the scripts in the [bro-osquery repository](https://github.com/bro/bro-osquery) repository in the folder named `osquery`.
 To make the scripts available in Bro, either copy/link this folder into *$PREFIX/share/bro/site* (see [Bro manual](https://www.bro.org/sphinx/quickstart/index.html#bro-scripts)) or make the environment variable BROPATH to point to the framework folder (see [Bro manual](https://www.bro.org/sphinx/quickstart/index.html#telling-bro-which-scripts-to-load)).

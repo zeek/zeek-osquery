@@ -31,7 +31,7 @@ Then, the **Bro Script Framework** needs to be installed.
 
 **Osquery** is originally a standalone host monitor and does not include the Bro plugins yet. Hence, bro-osquery cannot currently be used with the official osquery binaries. Use our customized osquery instead.
 
-For detailed installation instructions please refer to the (installation guide)[https://github.com/bro/bro-osquery/install_guide.md].
+For detailed installation instructions please refer to the [installation guide](https://github.com/bro/bro-osquery/blob/master/install_guide.md).
 
 ## Deployment ##
 
