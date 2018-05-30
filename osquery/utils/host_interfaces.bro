@@ -23,6 +23,7 @@ export {
 
     ## Retrieval
     global getHostInfoByHostID: function(host_id: string): HostInfo;
+    global getHostInfosByAddress: function(a: addr): vector of HostInfo;
 
     ## Modification
     global removeHost: function(host_id: string);
@@ -110,6 +111,25 @@ function getHostInfoByHostID(host_id: string): HostInfo
 
     local new_interface_info: table[string] of InterfaceInfo;
     return [$host="", $interface_info=new_interface_info];
+}
+
+function getHostInfosByAddress(a: addr): vector of HostInfo
+{
+    local host_infos_new: vector of HostInfo;
+    for (host_id in host_info_hostid) {
+        local interface_info = host_info_hostid[host_id]$interface_info;
+        for (iface_name in interface_info) {
+            if (interface_info[iface_name]?$ipv4 && interface_info[iface_name]$ipv4 == a) {
+                host_infos_new[|host_infos_new|] = host_info_hostid[host_id];
+                break;
+            }
+            if (interface_info[iface_name]?$ipv6 && interface_info[iface_name]$ipv6 == a) {
+                host_infos_new[|host_infos_new|] = host_info_hostid[host_id];
+                break;
+            }
+        }
+    }
+    return host_infos_new;
 }
 
 ###

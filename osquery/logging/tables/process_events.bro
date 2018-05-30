@@ -1,6 +1,6 @@
 #! Logs processes activity.
 
-module osquery::processes;
+module osquery::process_events;
 
 export {
         redef enum Log::ID += { LOG };
@@ -9,23 +9,19 @@ export {
                 t: time &log;
                 host: string &log;
                 pid: int &log;
-                name: string &log;
 		path: string &log;
 		cmdline: string &log;
 		cwd: string &log;
-		root: string &log;
 		uid: int &log;
 		gid: int &log;
-		on_disk: int &log;
 		start_time: int &log;
 		parent: int &log;
-		pgroup: int &log;
         };
 }
 
-event host_processes(resultInfo: osquery::ResultInfo,
-		pid: int, name: string, path: string, cmdline: string, cwd: string, root: string, uid: int, gid: int, on_disk: int, 
-		start_time: int, parent: int, pgroup: int)
+event host_process_event(resultInfo: osquery::ResultInfo,
+		pid: int, path: string, cmdline: string, cwd: string, uid: int, gid: int,
+		start_time: int, parent: int)
         {
         if ( resultInfo$utype != osquery::ADD )
                 # Just want to log new process existance.
@@ -35,17 +31,13 @@ event host_processes(resultInfo: osquery::ResultInfo,
 		$t=network_time(),
 		$host=resultInfo$host,
                	$pid = pid,
-                $name = name,
                 $path = path,
                 $cmdline = cmdline,
                 $cwd = cwd,
-                $root = root,
                 $uid = uid,
                 $gid = gid,
-                $on_disk = on_disk,
                 $start_time = start_time,
-                $parent = parent,
-                $pgroup = pgroup
+                $parent = parent
         ];
 
         Log::write(LOG, info);
@@ -53,10 +45,8 @@ event host_processes(resultInfo: osquery::ResultInfo,
 
 event bro_init()
         {
-        Log::create_stream(LOG, [$columns=Info, $path="osq-processes"]);
+        Log::create_stream(LOG, [$columns=Info, $path="osq-process_events"]);
 
-	Broker::enable();
-
-        local query = [$ev=host_processes,$query="SELECT pid,name,path,cmdline,cwd,root,uid,gid,on_disk,start_time,parent,pgroup FROM processes"];
+        local query = [$ev=host_process_event,$query="SELECT pid,path,cmdline,cwd,uid,gid,time,parent FROM process_events"];
         osquery::subscribe(query);
         }

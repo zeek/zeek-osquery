@@ -44,7 +44,11 @@ event host_info_net(resultInfo: osquery::ResultInfo, interface: string, ip: stri
         # Update the interface
         osquery::host_interfaces::updateInterface(osquery::host_interfaces::REMOVE, host_id, interface, to_addr(ip), mac);
 
+        # Check for subscriptions to cancel
+        #TODO
+
         # Check for groups to leave
+        #TODO
     }
 
     # Log the change
@@ -65,8 +69,6 @@ event osquery::host_disconnected(host_id: string)
 event bro_init()
 {
     Log::create_stream(LOG, [$columns=Info, $path="osq-host_info"]);
-
-    Broker::enable();
 
     local ev = [$ev=host_info_net,$query="SELECT a.interface, a.address, d.mac from interface_addresses as a INNER JOIN interface_details as d ON a.interface=d.interface;", $utype=osquery::BOTH];
     osquery::subscribe(ev);

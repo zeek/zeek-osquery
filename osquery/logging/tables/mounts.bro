@@ -44,8 +44,6 @@ event host_mounts(resultInfo: osquery::ResultInfo,
 event bro_init()
 	{
 	Log::create_stream(LOG, [$columns=Info, $path="osq-mounts"]);
-	
-	Broker::enable();
 
 	local ev = [$ev=host_mounts,$query="SELECT device,device_alias,path,type,blocks_size,blocks,flags FROM mounts"];
 	osquery::subscribe(ev);
