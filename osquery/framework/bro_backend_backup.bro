@@ -1,26 +1,9 @@
 @load base/frameworks/broker
 @load base/frameworks/logging
 
-@load ./utils/host_interfaces
-
-const broker_port: port = 9999/tcp &redef;
-#redef Broker::endpoint_name = "Bro";
-
-module osquery;
+module osquery::backbone;
 
 export {
-    # Topic prefix used for all topics in osquery communication
-    const TopicPrefix: string = "/bro/osquery" &redef;
-    # Topic to which hosts send announce messages
-    const HostAnnounceTopic: string = fmt("%s/announce",TopicPrefix) &redef;
-    # Topic for individual hosts
-    const HostIndividualTopic: string = fmt("%s/uid",TopicPrefix) &redef;
-    # Topic for groups
-    const HostGroupTopic: string = fmt("%s/group",TopicPrefix) &redef;
-    # Topic to address all hosts (default to send query requests)
-    const HostBroadcastTopic: string = fmt("%s/all",TopicPrefix) &redef;
-    # Undividual channel of this bro instance (default to receive query results)
-    const BroID_Topic: string = fmt("%s/%s",HostIndividualTopic,"BroMaster") &redef;
 
 ###
 ### Logging
@@ -52,40 +35,6 @@ export {
 #                             #
 ###############################
 
-###
-### Structures used in requests and responses.
-###
-
-    ## Type defining the type of osquery change we are interested in.
-    type UpdateType: enum {
-        ADD,	##< Report new elements.
-        REMOVE,	##< Report removed element.
-        BOTH,	##< Report both new and removed elements.
-        SNAPSHOT##< Report the current status at query time.
-    };
-
-    ## Type defining a SQL query and schedule/execution parameters to be send to hosts.
-    type Query: record {
-        ## The osquery SQL query selecting the activity to subscribe to.
-        query: string;
-        ## The type of update to report.
-        utype: UpdateType &default=ADD;
-        ## The interval of the query
-        inter: count &optional;
-        ## The Broker topic THEY send the query result to
-        resT: string &default=BroID_Topic;
-        ## The Bro event to execute when receiving updates.
-        ev: any &optional;
-        ## A cookie we can set to match the result event
-        cookie: string &default="";
-    };
-
-    ## Type defining the event header of responses
-    type ResultInfo: record {
-        host: string;
-        utype: UpdateType;
-        cookie: string &optional;
-    };
 
 ###
 ### Function signatures for subscribe, unsubscribe, execute and join.
@@ -806,13 +755,12 @@ event host_error(peer_name: string, msg: string)
 ### Host Tracking
 ###
 
-event osquery::host_new(host_id: string, group_list: vector of string)
+event osquery::bro_new(bro_id: string)
 {
-    log_local("info", fmt("Received new announce message with uid %s", host_id));
-    log_peer("info", host_id, "New osquery host announcement");
+    log_bro("info", bro_id, "Bro node connected (announced)");
 
     # Internal client tracking
-    add hosts[host_id];
+    add bros[bro_id];
     for (i in group_list)
     {
         add groups[group_list[i]];
@@ -831,18 +779,14 @@ event osquery::host_new(host_id: string, group_list: vector of string)
     event osquery::host_connected(host_id);
 }
 
-#TODO: Handle peer_name and client_id
-event Broker::incoming_connection_established(peer_name: string)
-{
-    log_peer("info", peer_name, "incoming connection established");
-}
-
 event Broker::incoming_connection_broken(peer_name: string)
 {
-    log_peer("info", peer_name, "incoming connection broken");
+    if (peer_name !in bros) return;
+
+    log_bro("info", peer_name, "Bro node disconnected");
 
     # Internal client tracking
-    delete hosts[peer_name];
+    delete bros[peer_name];
 
     # Check if anyone else is left in the groups
     local others_groups: set[string];

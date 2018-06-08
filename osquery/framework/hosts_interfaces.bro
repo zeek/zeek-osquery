@@ -1,6 +1,4 @@
-#! Provides current interface information about hosts.
-
-module osquery::host_interfaces;
+module osquery::hosts;
 
 export {
     type InterfaceInfo: record {
@@ -15,33 +13,45 @@ export {
         # IP addresses and MAC address per interface name
         interface_info: table[string] of InterfaceInfo;
     };
+    
+    ## A hook interface to notify when the IP address on a host changes
+    global host_addr_updated: hook(uytpe: osquery::UpdateType, host_id: string, ip: addr);
 
-    type UpdateType: enum {
-        ADD,
-        REMOVE
-    };
-
-    ## Retrieval
+    ## Get the Host Info of a host by its id
+    ##
+    ## host_id: The identifier of the host
     global getHostInfoByHostID: function(host_id: string): HostInfo;
+
+    ## Get the Host Info of a host by its address
+    ##
+    ## ip: the ip address of the host
     global getHostInfosByAddress: function(a: addr): vector of HostInfo;
 
-    ## Modification
-    global removeHost: function(host_id: string);
-    global updateInterface: function(utype: UpdateType, host_id: string, interface: string, ip: addr, mac: string);
-}
+    ## Get the IP addresses of a host by its id
+    ##
+    ## host_id: The identifier of the host
+    global getIPsOfHost: function(host_id: string): vector of addr;
 
-# Set for the IDs of hosts
-global hosts: set[string];
+    ## Update the interface of a host when the IP assignment changes
+    ##
+    ## utype: If the IP address was added or removed
+    ## host_id: The identifier of the host
+    ## interface: The name of the interface on the host
+    ## ip: The ip address that changed
+    ## mac: The mac address that changed
+    global updateInterface: function(utype: osquery::UpdateType, host_id: string, interface: string, ip: addr, mac: string);
+
+    ## Remove a host together with its interfaces
+    ##
+    ## host_id: The identifier of the host
+    global removeHost: function (host_id: string);
+}
 
 # Set of HostInfos
 global host_infos: set[HostInfo];
 
 # Table to access HostInfos by HostID
 global host_info_hostid: table[string] of HostInfo;
-
-###
-### Helper
-###
 
 function equalInterfaceInfo(ii1: InterfaceInfo, ii2: InterfaceInfo): bool
 {
@@ -70,43 +80,10 @@ function equalHostInfo(hi1: HostInfo, hi2: HostInfo): bool
     return T;
 }
 
-##
-## Add and remove hosts
-##
-
-function addHost(host_id: string)
-{
-    # Include the new host
-    add hosts[host_id];
-    # Setup a HostInfo Object
-    local interface_info_new: table[string] of InterfaceInfo;
-    local host_info_new: HostInfo = [$host=host_id, $interface_info=interface_info_new];
-    add host_infos[host_info_new];
-    host_info_hostid[host_id] = host_info_new;
-}
-
-function removeHost(host_id: string)
-{
-    if (host_id ! in hosts)
-    {
-        return;
-    }
-
-    local host_info = host_info_hostid[host_id];
-
-    # Remove HostInfo from lookup tables
-    delete host_info_hostid[host_id];
-    delete host_infos[host_info];
-    delete hosts[host_id];
-}
-
-###
-### Retrieval
-###
 
 function getHostInfoByHostID(host_id: string): HostInfo
 {
-    if (host_id in hosts)
+    if (host_id in host_info_hostid)
         return host_info_hostid[host_id];
 
     local new_interface_info: table[string] of InterfaceInfo;
@@ -132,9 +109,42 @@ function getHostInfosByAddress(a: addr): vector of HostInfo
     return host_infos_new;
 }
 
-###
-### Modification
-###
+# 
+function getIPsOfHost(host_id: string): vector of addr
+{
+    local ips: vector of addr;
+    local hostInfo = getHostInfoByHostID(host_id);
+    for (j in hostInfo$interface_info)
+    {
+        local interfaceInfo = hostInfo$interface_info[j];
+        if (interfaceInfo?$ipv4) ips[|ips|] = interfaceInfo$ipv4;
+        if (interfaceInfo?$ipv6) ips[|ips|] = interfaceInfo$ipv6;
+    }
+    return ips;
+}
+
+function addHost(host_id: string)
+{
+    # Setup a HostInfo Object
+    local interface_info_new: table[string] of InterfaceInfo;
+    local host_info_new: HostInfo = [$host=host_id, $interface_info=interface_info_new];
+    add host_infos[host_info_new];
+    host_info_hostid[host_id] = host_info_new;
+}
+
+function removeHost(host_id: string)
+{
+    if (host_id ! in host_info_hostid)
+    {
+        return;
+    }
+
+    local host_info = host_info_hostid[host_id];
+
+    # Remove HostInfo from lookup tables
+    delete host_info_hostid[host_id];
+    delete host_infos[host_info];
+}
 
 function remove_from_interface_info(host_id: string, interface: string, ip: addr, mac: string)
 {
@@ -238,23 +248,27 @@ function add_to_interface_info(host_id: string, interface: string, ip: addr, mac
     }
 }
 
-function updateInterface(utype: UpdateType, host_id: string, interface: string, ip: addr, mac: string)
+function updateInterface(utype: osquery::UpdateType, host_id: string, interface: string, ip: addr, mac: string)
 {
-    if (utype == ADD)
+    if (utype == osquery::ADD)
     {
-        if (host_id ! in hosts)
+        if (host_id ! in host_info_hostid)
         {
             addHost(host_id);
         }
         add_to_interface_info(host_id, interface, ip, mac);
     }
     else
-    if (utype == REMOVE)
+    if (utype == osquery::REMOVE)
     {
-        if (host_id in hosts)
+        if (host_id in host_info_hostid)
         {
             remove_from_interface_info(host_id, interface, ip, mac);
+        
         }
     }
 
+    # Check for groups to join/leave (and subscriptions to add/remove)
+    hook host_addr_updated(utype, host_id, ip);
 }
+

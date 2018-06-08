@@ -144,7 +144,7 @@ function extend_connection_info(c: connection): bool
 {
     # Check the origin of the connection
     # - Get list of hosts with this source IP
-    local host_infos = osquery::host_interfaces::getHostInfosByAddress(c$conn$id$orig_h);
+    local host_infos = osquery::hosts::getHostInfosByAddress(c$conn$id$orig_h);
 
     # - Lookup if any of the source candidates connected to the target
     for (host_info_idx in host_infos) {
@@ -169,7 +169,7 @@ function extend_connection_info(c: connection): bool
 
     # Check the response of the connection
     # - Get list of hosts with this target IP
-    host_infos = osquery::host_interfaces::getHostInfosByAddress(c$conn$id$resp_h);
+    host_infos = osquery::hosts::getHostInfosByAddress(c$conn$id$resp_h);
 
     # - Lookup if any of target candidates bound on the target port
     for (host_info_idx in host_infos) {
