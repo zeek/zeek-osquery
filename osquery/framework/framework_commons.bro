@@ -7,20 +7,29 @@ export {
 
     # Topic prefix used for all topics in osquery communication
     const TopicPrefix: string = "/bro/osquery" &redef;
-    # Topic to which hosts send announce messages
-    const AnnounceTopic: string = fmt("%s/announce",TopicPrefix) &redef;
+
+    # Topic for individual bros
+    const BroIndividualTopic: string = fmt("%s/bro",TopicPrefix) &redef;
+    # Topic to address all bro
+    const BroBroadcastTopic: string = fmt("%s/bros",TopicPrefix) &redef;
+    # Individual channel of this bro instance
+    const BroID_Topic: string = fmt("%s/%s",BroIndividualTopic,endpoint_name) &redef; 
+
     # Topic for individual hosts
     const HostIndividualTopic: string = fmt("%s/host",TopicPrefix) &redef;
     # Topic for groups
     const HostGroupTopic: string = fmt("%s/group",TopicPrefix) &redef;
-    # Topic to address all hosts (default to send query requests)
+    # Topic to address all hosts
     const HostBroadcastTopic: string = fmt("%s/hosts",TopicPrefix) &redef;
-    # Undividual channel of this bro instance (default to receive query results)
- 
+
+    # Topic to which bros send announce messages
+    const BroAnnounceTopic: string = fmt("%s/bro_announce",TopicPrefix) &redef;
+    # Topic to which hosts send announce messages
+    const HostAnnounceTopic: string = fmt("%s/host_announce",TopicPrefix) &redef;
+
     ## The osquery logging stream identifier.
     redef enum Log::ID += { LOG };
 
-   const BroID_Topic: string = fmt("%s/%s",HostIndividualTopic,endpoint_name) &redef;
 
     ## A record type containing the column fields of the osquery log.
     type Info: record {
@@ -80,6 +89,16 @@ export {
     ## client_id: An id that uniquely identifies an osquery host
     global host_disconnected: event (host_id: string);
 
+    ## Event that signals the connection of a new bro
+    ##
+    ## client_id: An id that uniquely identifies a bro
+    global bro_connected: event (bro_id: string);
+
+    ## Event that signals the disconnection of a bro
+    ##
+    ## client_id: An id that uniquely identifies a bro
+    global bro_disconnected: event (bro_id: string);
+
     ## Log a message of local scope for this bro node
     ##
     ## level: the severity of the message
@@ -100,8 +119,7 @@ export {
     ## msg: the message content
     global log_osquery: function(level: string, peer: string, msg: string, log: any &default=LOG);
 
-
-    ## Comparison of two events to be equal
+    ## Comparison of two queries to be equal
     global same_event: function (q1: Query, q2: Query): bool;
 }
 

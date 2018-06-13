@@ -4,10 +4,10 @@ export {
     ## Subscribe to an event. Whenever an osquery client connects to us, we'll subscribe to all matching activity
     ## from it.
     ##
-    ## The queries is an mandatory parameter and contains 1 or more queries. Each of them is send to the specified hosts
-    ## and the specified groups. If neither is given, each query is broadcasted to all hosts.
+    ## The query is an mandatory parameter and contains one query. It is send to the specified hosts
+    ## and the specified groups. If neither is given, the query is broadcasted to all hosts.
     ##
-    ## qs: The queries to subscribe to.
+    ## q: The queries to subscribe to.
     ## host_list: Specific hosts to address per query (optional).
     ## group_list: Specific groups to address per query (optional).
     global insert_subscription: function(q: osquery::Query, host_list: vector of string &default=vector(""), group_list: vector of string &default=vector(""));
@@ -15,20 +15,20 @@ export {
     ## Unsubscribe from an events. This will get sent to all clients that are currently connected and would match
     ## a similar subscribe call.
     ##
-    ## The queries is an mandatory parameter and contains 1 or more queries. Each of them is send to the specified hosts
-    ## and the specified groups. If neither is given, each query is broadcasted to all hosts.
+    ## The query is an mandatory parameter and contains one query. It is send to the specified hosts
+    ## and the specified groups. If neither is given, the query is broadcasted to all hosts.
     ##
-    ## qs: The queries to revoke.
+    ## q: The queries to revoke.
     ## host_list: Specific hosts to address per query (optional).
     ## group_list: Specific groups to address per query (optional).
     global remove_subscription: function(q: osquery::Query, host_list: vector of string &default=vector(""), group_list: vector of string &default=vector(""));
 
     ## Send a one-time query to all currently connected clients.
     ##
-    ## The queries is an mandatory parameter and contains 1 or more queries. Each of them is send to the specified hosts
-    ## and the specified groups. If neither is given, each query is broadcasted to all hosts.
+    ## The query is an mandatory parameter and contains one query. It is send to the specified hosts
+    ## and the specified groups. If neither is given, the query is broadcasted to all hosts.
     ##
-    ## qs: The queries to execute.
+    ## q: The queries to execute.
     ## host_list: Specific hosts to address per query (optional).
     ## group_list: Specific groups to address per query (optional).
     global insert_execution: function(q: osquery::Query, host_list: vector of string &default=vector(""), group_list: vector of string &default=vector(""));
@@ -36,33 +36,33 @@ export {
     ## Make subnets to be addressed by a group. Whenever an osquery client connects to us, we'll instruct it to join
     ## the given group.
     ##
-    ## range: the subnet that is addressed.
+    ## range_list: the subnets that are addressed.
     ## group: the group hosts should join.
     global insert_grouping: function(range_list: vector of subnet, group: string);
 
     ## Make subnets to be no longer addressed by a group. This will get sent to all clients that are currently connected and would match
     ## a similar join call
     ##
-    ## range: the subnet that is addressed.
+    ## range_list: the subnets that are addressed.
     ## group: the group hosts should leave.
     global remove_grouping: function(range_list: vector of subnet, group: string);
-}
 
-# Internal record for tracking a subscription.
-type Subscription: record {
-    query: osquery::Query;
-    hosts: vector of string;
-    groups: vector of string;
-};
+    # Internal record for tracking a subscription.
+    type Subscription: record {
+        query: osquery::Query;
+        hosts: vector of string;
+        groups: vector of string;
+    };
+
+    # Internal record for tracking groups
+    type Grouping: record {
+        group: string;
+        ranges: vector of subnet;
+    };
+}
 
 # Internal vector of subscriptions
 global subscriptions: vector of Subscription;
-
-# Internal record for tracking groups
-type Grouping: record {
-    group: string;
-    ranges: vector of subnet;
-};
 
 # Internal vector of host groupins
 global groupings: vector of Grouping;
@@ -75,6 +75,9 @@ global groups: set[string] = {osquery::HostBroadcastTopic};
 
 # Internal table for tracking client (ids) and their respective groups
 global host_groups: table[string] of vector of string;
+
+# Internal mapping of broker id (peer_name) to osquery id (host_id)
+global peer_to_host: table[string] of string;
 
 function insert_subscription(q: osquery::Query, host_list: vector of string, group_list: vector of string)
 {

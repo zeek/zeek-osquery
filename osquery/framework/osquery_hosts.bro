@@ -175,12 +175,12 @@ hook host_addr_updated(utype: osquery::UpdateType, host_id: string, ip: addr)
     }
 }
 
-
-event osquery::hosts::host_new(host_id: string, group_list: vector of string)
+event osquery::hosts::host_new(peer_name: string, host_id: string, group_list: vector of string)
 {
-    osquery::log_osquery("info", host_id, "Osquery host connected (announced)");
+    osquery::log_osquery("info", host_id, fmt("Osquery host connected (announced as %s)", peer_name));
 
     # Internal client tracking
+    peer_to_host[peer_name] = host_id;
     add hosts[host_id];
     for (i in group_list)
     {
@@ -200,42 +200,44 @@ event osquery::hosts::host_new(host_id: string, group_list: vector of string)
 event Broker::peer_lost(endpoint: Broker::EndpointInfo, msg: string)
 {
     local peer_name: string = {endpoint$id};
-    if (peer_name !in hosts) return;
+    if (peer_name !in peer_to_host) return;
 
-    osquery::log_osquery("info", peer_name, "Osquery host disconnected");
+    local host_id: string = peer_to_host[peer_name];
+    osquery::log_osquery("info", host_id, "Osquery host disconnected");
 
     # Internal client tracking
-    delete hosts[peer_name];
+    delete hosts[host_id];
 
     # Check if anyone else is left in the groups
     local others_groups: set[string];
     # Collect set of groups others are in
     for (i in host_groups)
     {
-        if ( i != peer_name ) {
+        if ( i != host_id ) {
             for ( j in host_groups[i]) {
                 add others_groups[ host_groups[i][j] ] ;
             }
         }
     }
     # Remove group if no one else has the group
-    for (k in host_groups[peer_name])
+    for (k in host_groups[host_id])
     {
-        local host_g: string = host_groups[peer_name][k];
+        local host_g: string = host_groups[host_id][k];
         if ( host_g !in others_groups )
         {
             delete groups[host_g];
         }
     }
-    delete host_groups[peer_name];
+    delete host_groups[host_id];
 
     # raise event for the disconnected host
-    event osquery::host_disconnected(peer_name);
+    event osquery::host_disconnected(host_id);
 }
 
 event bro_init()
 {
-  local topic: string = osquery::AnnounceTopic;
+  # Listen on host announce topic
+  local topic: string = osquery::HostAnnounceTopic;
   osquery::log_local("info", fmt("Subscribing to host annouce topic %s", topic));
   Broker::subscribe(topic);
 } 

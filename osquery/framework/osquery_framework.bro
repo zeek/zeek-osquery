@@ -108,7 +108,7 @@ function subscribe(q: Query, host: string, group: string)
 
 function subscribe_multiple(q: Query, host_list: vector of string, group_list: vector of string)
 {
-    #osquery::bros::subscribe_multiple(q, host_list, group_list);
+    osquery::bros::share_subscription(q, host_list, group_list);
     osquery::hosts::insert_subscription(q, host_list, group_list);
 }
 
@@ -121,7 +121,7 @@ function unsubscribe(q: Query, host: string, group: string)
 
 function unsubscribe_multiple(q: Query, host_list: vector of string, group_list: vector of string)
 {
-    #osquery::bros::unsubscribe_multiple(q, host_list, group_list);
+    osquery::bros::unshare_subscription(q, host_list, group_list);
     osquery::hosts::remove_subscription(q, host_list, group_list);
 }
 
@@ -134,7 +134,7 @@ function execute(q: Query, host: string, group: string)
 
 function execute_multiple(q: Query, host_list: vector of string, group_list: vector of string)
 {
-    #osquery::bros::execute_multiple(qs, host_list, group_list);
+    osquery::bros::share_execution(q, host_list, group_list);
     osquery::hosts::insert_execution(q, host_list, group_list);
 }
 
@@ -146,7 +146,7 @@ function join(range: subnet, group: string)
 
 function join_multiple(range_list: vector of subnet, group: string)
 {
-    #osquery::bros::join_multiple(range_list, group);
+    osquery::bros::share_grouping(range_list, group);
     osquery::hosts::insert_grouping(range_list, group);
 }
 
@@ -158,11 +158,10 @@ function leave(range: subnet, group: string)
 
 function leave_multiple(range_list: vector of subnet, group: string)
 {
-    #osquery::bros::leave_multiple(range_list, group);
+    osquery::bros::unshare_grouping(range_list, group);
     osquery::hosts::remove_grouping(range_list, group);
 }
 
-## 
 event Broker::peer_added(endpoint: Broker::EndpointInfo, msg: string)
 {
     local peer_name: string = {endpoint$id};
