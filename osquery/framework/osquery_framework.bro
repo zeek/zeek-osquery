@@ -175,21 +175,18 @@ event Broker::peer_added(endpoint: Broker::EndpointInfo, msg: string)
     {
         log_local("info", fmt("Unkown connection established with %s", peer_name));
     }
-    print(fmt("Added: %s", msg));
 }
 
 event Broker::peer_removed(endpoint: Broker::EndpointInfo, msg: string)
 {
     local peer_name: string = {endpoint$id};
     log_local("info", fmt("Removed connection with %s", peer_name));
-    print(fmt("Removed: %s", msg));
 }
 
 event Broker::peer_lost(endpoint: Broker::EndpointInfo, msg: string)
 {
     local peer_name: string = {endpoint$id};
     log_local("info", fmt("Lost connection with %s", peer_name));
-    print(fmt("Lost: %s", msg));
 }
 
 event Broker::status(endpoint: Broker::EndpointInfo, msg: string)
@@ -209,5 +206,5 @@ event bro_init()
     # for different applications to use Broker jointly without messing up
     # whatever another one is doing.
 
-    Broker::listen("0.0.0.0", broker_port);
+    Broker::listen(broker_ip, broker_port);
 }
