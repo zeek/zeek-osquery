@@ -409,7 +409,7 @@ event osquery::host_connected(host_id: string) {
     osquery::execute(ev_processes, host_id);
     
     local ev_sockets = [$ev=host_user_socket_event, $query="SELECT 'snapshot' AS action, s.local_address, s.local_port, s.remote_address, s.remote_port, s.pid, p.path from process_open_sockets s LEFT JOIN processes p ON s.pid = p.pid WHERE family=2 AND 1=1"];
-    osquery::execute(ev_sockets);
+    osquery::execute(ev_sockets, host_id);
 }
 
 event bro_init()
