@@ -4,7 +4,7 @@
 
 ### Compile Osquery
 
-The most recent osquery development required for bro-osquery is currently located in the [osquery fork by iBigQ](https://github.com/iBigQ/osquery). It is based on osquery version 2.11.2 and is upgraded to the latest osquery version when possible.
+The most recent osquery development required for bro-osquery is currently located in the [osquery fork by iBigQ](https://github.com/iBigQ/osquery). It is based on osquery version 3.2.6 and is upgraded to the latest osquery version when possible.
 
 ```
 git clone --recursive https://github.com/iBigQ/osquery
