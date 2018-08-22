@@ -17,6 +17,7 @@ This installs software packets using your packet manager to satisfy all system d
 > make sysprep
 
 **4. Place osquery dependencies**  
+This installs dependencies locally into a custom directory, i.e., */usr/local/osquery/*. No worries, this does not mess up with your system libraries.
 > make deps  
 > ./tools/provision.sh install osquery/osquery-local/caf  
 > ./tools/provision.sh install osquery/osquery-local/broker
