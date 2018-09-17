@@ -127,7 +127,7 @@ function send_subscriptions_new_group(host_id: string, group: string)
 ##
 ##
 ##
-function send_joins_new_address(host_id: string, ip: addr): vector of string
+function send_joins_new_address(host_id: string, ip: addr)
 {
     local host_topic = fmt("%s/%s", osquery::HostIndividualTopic,host_id);
     local new_groups: vector of string;

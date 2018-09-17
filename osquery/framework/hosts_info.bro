@@ -17,9 +17,23 @@ export {
 
 event host_info_net(resultInfo: osquery::ResultInfo, interface: string, ip: string, mac: string)
 {
+    # Remove interface name from IP
+    if ("%" in ip)
+    {
+        # Find position of delimiter
+        local i = 0;
+        while (i < |ip|)
+        {
+            if (ip[i] == "%") break;
+            i += 1;
+        }
+
+        ip = ip[:i];
+    }
+
     # Update the interface
     local host_id = resultInfo$host;
-    osquery::hosts::updateInterface(osquery::REMOVE, host_id, interface, to_addr(ip), mac);
+    osquery::hosts::updateInterface(resultInfo$utype, host_id, interface, to_addr(ip), mac);
 
     # Log the change
     Log::write(LOG, [$ts = network_time(),

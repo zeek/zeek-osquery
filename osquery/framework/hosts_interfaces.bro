@@ -150,7 +150,7 @@ function remove_from_interface_info(host_id: string, interface: string, ip: addr
 {
     # Retrieve the HostInfo Object for the respective host
         local host_info = host_info_hostid[host_id];
-    print(fmt("About to remove InterfaceInfo for host %s and interface %s", host_id, interface));
+    #print(fmt("About to remove InterfaceInfo for host %s and interface %s", host_id, interface));
 
     # Check if InterfaceInfo exists for the interface
     if (interface ! in  host_info$interface_info)
@@ -209,7 +209,7 @@ function add_to_interface_info(host_id: string, interface: string, ip: addr, mac
 {
     # Retrieve the HostInfo Object for the respective host
     local host_info = host_info_hostid[host_id];
-    print(fmt("About to add InterfaceInfo for host %s and interface %s", host_id, interface));
+    #print(fmt("About to add InterfaceInfo for host %s and interface %s", host_id, interface));
 
     # Create new InterfaceInfo for the interface if needed
     if (interface ! in host_info$interface_info)

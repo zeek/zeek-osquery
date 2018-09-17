@@ -144,11 +144,19 @@ function extend_connection_info(c: connection): bool
 {
     # Check the origin of the connection
     # - Get list of hosts with this source IP
-    local host_infos = osquery::hosts::getHostInfosByAddress(c$conn$id$orig_h);
+    local srcHost_infos = osquery::hosts::getHostInfosByAddress(c$conn$id$orig_h);
+    # - Get list of hosts with this target IP
+    local dstHost_infos = osquery::hosts::getHostInfosByAddress(c$conn$id$resp_h);
+
+    if (|srcHost_infos| + |dstHost_infos| == 0)
+    {
+        #print(fmt("No osquery host found for connection (%s:%s -> %s:%s) ", c$conn$id$orig_h, c$conn$id$orig_p, c$conn$id$resp_h, c$conn$id$resp_p));
+        return F;
+    }
 
     # - Lookup if any of the source candidates connected to the target
-    for (host_info_idx in host_infos) {
-        local host_id = host_infos[host_info_idx]$host;
+    for (host_info_idx in srcHost_infos) {
+        local host_id = srcHost_infos[host_info_idx]$host;
         
         if (host_id !in connect_cache) { next; }
         if ([c$conn$id$resp_h, port_to_count(c$conn$id$resp_p)] !in connect_cache[host_id]) { next; }
@@ -168,12 +176,10 @@ function extend_connection_info(c: connection): bool
     }
 
     # Check the response of the connection
-    # - Get list of hosts with this target IP
-    host_infos = osquery::hosts::getHostInfosByAddress(c$conn$id$resp_h);
 
     # - Lookup if any of target candidates bound on the target port
-    for (host_info_idx in host_infos) {
-        host_id = host_infos[host_info_idx]$host;
+    for (host_info_idx in dstHost_infos) {
+        host_id = dstHost_infos[host_info_idx]$host;
         
         if (host_id !in bind_cache) { print("host_id not in bind_cache"); next; }
 
