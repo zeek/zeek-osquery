@@ -47,6 +47,16 @@ export {
     ## group: the group hosts should leave.
     global remove_grouping: function(range_list: vector of subnet, group: string);
 
+    ## Hook to retrieve the IP addresses of a host by its id
+    ##
+    ## host_id: The identifier of the host
+    global getIPsOfHost: hook(host_id: string, addresses: vector of addr);
+
+    ## Peer Status of host
+    ##
+    ## host_id: The identifier of the host
+    global isHostAlive: function(host_id: string): bool;
+
     # Internal record for tracking a subscription.
     type Subscription: record {
         query: osquery::Query;
@@ -186,7 +196,8 @@ function insert_grouping(range_list: vector of subnet, group: string)
         local host_topic = fmt("%s/%s", osquery::HostIndividualTopic,host);
         local skip_host = F;
 
-        local hostIPs: vector of addr = getIPsOfHost(host);
+        local hostIPs: vector of addr;
+        hook getIPsOfHost(host, hostIPs);
         for (j in hostIPs)
         {
             if (skip_host) break;
@@ -212,3 +223,6 @@ function remove_grouping(range_list: vector of subnet, group: string)
   #TODO notImplemented
 }
 
+function isHostAlive(host_id: string): bool {
+    return host_id in hosts;
+}

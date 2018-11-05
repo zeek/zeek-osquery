@@ -177,7 +177,7 @@ hook host_addr_updated(utype: osquery::UpdateType, host_id: string, ip: addr)
 
 event osquery::hosts::host_new(peer_name: string, host_id: string, group_list: vector of string)
 {
-    osquery::log_osquery("info", host_id, fmt("Osquery host connected (announced as %s)", peer_name));
+    osquery::log_osquery("info", host_id, fmt("Osquery host connected (peer id: %s)", peer_name));
 
     # Internal client tracking
     peer_to_host[peer_name] = host_id;
@@ -199,10 +199,11 @@ event osquery::hosts::host_new(peer_name: string, host_id: string, group_list: v
 
 event Broker::peer_lost(endpoint: Broker::EndpointInfo, msg: string)
 {
-    local peer_name: string = {endpoint$id};
+    local peer_name: string = endpoint$id;
     if (peer_name !in peer_to_host) return;
 
     local host_id: string = peer_to_host[peer_name];
+    delete peer_to_host[peer_name];
     osquery::log_osquery("info", host_id, "Osquery host disconnected");
 
     # Internal client tracking

@@ -1,5 +1,7 @@
 module osquery::hosts;
 
+@load osquery/framework
+
 export {
     type InterfaceInfo: record {
         ipv4: addr &optional;
@@ -14,9 +16,6 @@ export {
         interface_info: table[string] of InterfaceInfo;
     };
     
-    ## A hook interface to notify when the IP address on a host changes
-    global host_addr_updated: hook(uytpe: osquery::UpdateType, host_id: string, ip: addr);
-
     ## Get the Host Info of a host by its id
     ##
     ## host_id: The identifier of the host
@@ -26,11 +25,6 @@ export {
     ##
     ## ip: the ip address of the host
     global getHostInfosByAddress: function(a: addr): vector of HostInfo;
-
-    ## Get the IP addresses of a host by its id
-    ##
-    ## host_id: The identifier of the host
-    global getIPsOfHost: function(host_id: string): vector of addr;
 
     ## Update the interface of a host when the IP assignment changes
     ##
@@ -45,6 +39,9 @@ export {
     ##
     ## host_id: The identifier of the host
     global removeHost: function (host_id: string);
+
+    ## A hook interface to notify when the IP address on a host changes
+    #global host_addr_updated: hook(uytpe: osquery::UpdateType, host_id: string, ip: addr);
 }
 
 # Set of HostInfos
@@ -110,17 +107,16 @@ function getHostInfosByAddress(a: addr): vector of HostInfo
 }
 
 # 
-function getIPsOfHost(host_id: string): vector of addr
+hook getIPsOfHost(host_id: string, addresses: vector of addr)
 {
-    local ips: vector of addr;
     local hostInfo = getHostInfoByHostID(host_id);
     for (j in hostInfo$interface_info)
     {
         local interfaceInfo = hostInfo$interface_info[j];
-        if (interfaceInfo?$ipv4) ips[|ips|] = interfaceInfo$ipv4;
-        if (interfaceInfo?$ipv6) ips[|ips|] = interfaceInfo$ipv6;
+        if (interfaceInfo?$ipv4) addresses[|addresses|] = interfaceInfo$ipv4;
+        if (interfaceInfo?$ipv6) addresses[|addresses|] = interfaceInfo$ipv6;
     }
-    return ips;
+    break;
 }
 
 function addHost(host_id: string)
