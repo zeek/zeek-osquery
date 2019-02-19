@@ -17,11 +17,11 @@ export {
 	};
 
 	type SocketInfo: record {
-                action: string &optional;
-                pid: int &optional;
+		action: string &optional;
+		pid: int &optional;
 		fd: int &optional;
-                path: string &optional;
-                family: int &optional;
+		path: string &optional;
+		family: int &optional;
 		connection: ConnectionTuple &default=[];
 		start_time: int &optional;
 		success: int &optional;
@@ -279,7 +279,7 @@ event listening_port_added(t: time, host_id: string, pid: int, fd: int, family: 
 	local path: string = "";
 	local start_time = 0;
 	local success: int = 1;
-	local remote_address = "";
+	local remote_address = "0.0.0.0";
 	local remote_port = 0;
 	_add_socket_state(host_id, action, pid, path, family, protocol, local_address, remote_address, local_port, remote_port, start_time, success);
 }
@@ -355,5 +355,154 @@ function getSocketInfosByConnectionTuple(connPattern: ConnectionTuple):  vector 
 		}
 	}
 	return socket_infos;
+}
+
+event socket_died_bind(resultInfo: osquery::ResultInfo, pid_str: string, family_str: string, local_addr: string, local_port_str: string) {
+	local pid = to_int(pid_str);
+	local family = to_int(family_str);
+	local local_port = to_int(local_port_str);
+	
+	local action: string = "bind";
+	local path: string = "";
+	local protocol: int = 0;
+	local remote_addr: string = "0.0.0.0";
+	local remote_port: int = 0;
+	local start_time: int = 0;
+	local success: int = 1;
+	schedule 30sec { scheduled_remove_socket_state(resultInfo$host, action, pid, path, family, protocol, local_addr, remote_addr, local_port, remote_port, start_time, success) };
+}
+
+event socket_died_bind_proto(resultInfo: osquery::ResultInfo, pid_str: string, family_str: string, local_addr: string, local_port_str: string, proto_str: string) {
+	local pid = to_int(pid_str);
+	local family = to_int(family_str);
+	local local_port = to_int(local_port_str);
+	local protocol = to_int(proto_str);
+	
+	local action: string = "bind";
+	local path: string = "";
+	local remote_addr: string = "0.0.0.0";
+	local remote_port: int = 0;
+	local start_time: int = 0;
+	local success: int = 1;
+	schedule 30sec { scheduled_remove_socket_state(resultInfo$host, action, pid, path, family, protocol, local_addr, remote_addr, local_port, remote_port, start_time, success) };
+}
+
+event socket_died_conn(resultInfo: osquery::ResultInfo, pid_str: string, family_str: string, remote_addr: string, remote_port_str: string) {
+	local pid = to_int(pid_str);
+	local family = to_int(family_str);
+	local remote_port = to_int(remote_port_str);
+	
+	local action: string = "connect";
+	local path: string = "";
+	local protocol: int = 0;
+	local local_addr: string = "0.0.0.0";
+	local local_port: int = 0;
+	local start_time: int = 0;
+	local success: int = 1;
+	schedule 30sec { scheduled_remove_socket_state(resultInfo$host, action, pid, path, family, protocol, local_addr, remote_addr, local_port, remote_port, start_time, success) };
+}
+
+event socket_died_snap(resultInfo: osquery::ResultInfo, pid_str: string, family_str: string, local_addr: string, remote_addr: string, local_port_str: string, remote_port_str: string, proto_str: string) {
+	local pid = to_int(pid_str);
+	local family = to_int(family_str);
+	local local_port = to_int(local_port_str);
+	local remote_port = to_int(remote_port_str);
+	local protocol = to_int(proto_str);
+	
+	local action: string = "snapshot";
+	local path: string = "";
+	local start_time: int = 0;
+	local success: int = 1;
+	schedule 30sec { scheduled_remove_socket_state(resultInfo$host, action, pid, path, family, protocol, local_addr, remote_addr, local_port, remote_port, start_time, success) };
+}
+
+event verify_socket_state(host_id: string) {
+	local query: osquery::Query;
+	local select_conns_bind: vector of string = vector();
+	local select_conns_bind_proto: vector of string = vector();
+	local select_conns_connect: vector of string = vector();
+	local select_conns_snapshot: vector of string = vector();
+	local query_string: string;
+	local socket_info: SocketInfo;
+	local conn: ConnectionTuple;
+
+	if (!osquery::hosts::isHostAlive(host_id)) { return; }
+
+	if (host_id !in host_sockets) { 
+		schedule 60sec { verify_socket_state(host_id) };
+		return; 
+	}
+
+	# Collect socket state
+	for (idx in host_sockets[host_id]) {
+	
+		socket_info = host_sockets[host_id][idx];
+		if (!socket_info?$action) { next; }
+		conn = socket_info$connection;
+			
+		# Bind
+		if (socket_info$action == "bind") {
+			if (conn?$protocol) {
+				select_conns_bind_proto[|select_conns_bind_proto|] = fmt("SELECT %d AS pid, %d AS family, \"%s\" AS local_address, %d AS local_port, %d AS protocol", socket_info$pid, socket_info$family, conn$local_address, conn$local_port, conn$protocol);
+			} else {
+				select_conns_bind[|select_conns_bind|] = fmt("SELECT %d AS pid, %d AS family, \"%s\" AS local_address, %d AS local_port", socket_info$pid, socket_info$family, conn$local_address, conn$local_port);
+			}
+		} 
+		# Connect
+		else if (socket_info$action == "connect") {
+			select_conns_connect[|select_conns_connect|] = fmt("SELECT %d AS pid, %d AS family, \"%s\" AS remote_address, %d AS remote_port", socket_info$pid, socket_info$family, conn$remote_address, conn$remote_port);
+		}
+		# Snapshot
+		else if (socket_info$action == "snapshot") {
+			select_conns_snapshot[|select_conns_snapshot|] = fmt("SELECT %d AS pid, %d AS family, \"%s\" AS local_address, \"%s\" AS remote_address, %d AS local_port, %d AS remote_port, %d AS protocol", socket_info$pid, socket_info$family, conn$local_address, conn$remote_address, conn$local_port, conn$remote_port, conn$protocol);
+		}
+	}
+
+	# Bind
+	if (|select_conns_bind| != 0) {
+		# Select query
+		query_string = fmt("SELECT b.pid, b.family, b.local_address, b.local_port FROM (%s) AS b LEFT JOIN (SELECT pid, family, local_address, local_port FROM listening_ports WHERE family = 2 AND pid != -1) AS o ON b.pid = o.pid AND b.family = o.family AND b.local_address = o.local_address AND b.local_port = o.local_port WHERE o.pid IS NULL" , join_string_vec(select_conns_bind, " UNION "));
+	
+		# Send query
+		query = [$ev=socket_died_bind, $query=query_string];
+		osquery::execute(query, host_id);
+	}
+	
+	# Bind with Proto
+	if (|select_conns_bind_proto| != 0) {
+		# Select query
+		query_string = fmt("SELECT b.pid, b.family, b.local_address, b.local_port, b.protocol FROM (%s) AS b LEFT JOIN (SELECT pid, family, local_address, local_port, protocol FROM listening_ports WHERE family = 2 AND pid != -1) AS o ON b.pid = o.pid AND b.family = o.family AND b.local_address = o.local_address AND b.local_port = o.local_port AND b.protocol = o.protocol WHERE o.pid IS NULL" , join_string_vec(select_conns_bind_proto, " UNION "));
+	
+		# Send query
+		query = [$ev=socket_died_bind_proto, $query=query_string];
+		osquery::execute(query, host_id);
+	}
+	
+	# Connect
+	if (|select_conns_connect| != 0) {
+		# Select query
+		query_string = fmt("SELECT b.pid, b.family, b.remote_address, b.remote_port FROM (%s) AS b LEFT JOIN (SELECT pid, family, remote_address, remote_port FROM process_open_sockets WHERE family = 2 AND pid != -1) AS o ON b.pid = o.pid AND b.family = o.family AND b.remote_address = o.remote_address AND b.remote_port = o.remote_port WHERE o.pid IS NULL" , join_string_vec(select_conns_connect, " UNION "));
+	
+		# Send query
+		query = [$ev=socket_died_conn, $query=query_string];
+		osquery::execute(query, host_id);
+	}
+	
+	# Snapshot
+	if (|select_conns_snapshot| != 0) {
+		# Select query
+		query_string = fmt("SELECT b.pid, b.family, b.local_address, b.remote_address, b.local_port, b.remote_port, b.protocol FROM (%s) AS b LEFT JOIN (SELECT pid, family, local_address, remote_address, local_port, remote_port, protocol FROM process_open_sockets WHERE family = 2 AND pid != -1) AS o ON b.pid = o.pid AND b.family = o.family AND b.local_address = o.local_address AND b.remote_address = o.remote_address AND b.local_port = o.local_port AND b.remote_port = o.remote_port AND b.protocol = o.protocol WHERE o.pid IS NULL" , join_string_vec(select_conns_snapshot, " UNION "));
+	
+		# Send query
+		query = [$ev=socket_died_snap, $query=query_string];
+		osquery::execute(query, host_id);
+	}
+	
+	# Schedule next verification
+	schedule 60sec { verify_socket_state(host_id) };
+}
+
+event osquery::host_connected(host_id: string) {
+	event verify_socket_state(host_id);
 }
 
