@@ -72,6 +72,9 @@ export {
 # Table to access SocketInfo by HostID
 global host_sockets: table[string] of vector of SocketInfo;
 
+# SocketInfos to delete
+global host_sockets_idx_delete: table[string] of set[int];
+
 function equalConnectionTuples(conn1: ConnectionTuple, conn2: ConnectionTuple): bool {
 	if (conn1?$local_address != conn2?$local_address) {
 		return F;
@@ -189,7 +192,7 @@ function _add_socket_state(host_id: string, action: string, pid: int, path: stri
 	#print(fmt("Added socket with tuple (%s:%d -> %s:%d) and protocol %d", local_address, local_port, remote_address, remote_port, protocol));
 }
 
-function _remove_socket_state(host_id: string, action: string, pid: int, path: string, family: int, protocol: int, local_address: string, remote_address: string, local_port: int, remote_port: int, start_time: int, success: int) {
+function _invalidate_socket_state(host_id: string, action: string, pid: int, path: string, family: int, protocol: int, local_address: string, remote_address: string, local_port: int, remote_port: int, start_time: int, success: int) {
 	#print(fmt("About to remove socket with tuple (%s:%d -> %s:%d) and protocol %d", local_address, local_port, remote_address, remote_port, protocol));
 	local local_addr: addr;
 	local remote_addr: addr;
@@ -224,20 +227,44 @@ function _remove_socket_state(host_id: string, action: string, pid: int, path: s
 	local socket_infos = getSocketInfosByHostIDByConnectionTuple(host_id, conn);
 	if (|socket_infos| != 1) {
 		#print(fmt("Not exactely 1 SocketInfo (is %d)", |socket_infos|));
-		return;
+		#return;
 	}
 
-	local socket_info: SocketInfo = socket_infos[0];
+	# Identify Indexes
+	for (idx in host_sockets[host_id]) {
+		for (jdx in socket_infos) {
+			if (equalSocketInfos(host_sockets[host_id][idx], socket_infos[jdx])) {
+				#print(fmt("Removed socket with tuple (%s:%d -> %s:%d) and protocol %d", local_address, local_port, remote_address, remote_port, protocol));
+				if (host_id !in host_sockets_idx_delete) {
+					host_sockets_idx_delete[host_id] = set();
+				}
+				add host_sockets_idx_delete[host_id][idx];
+			}
+		}
+	}
+}
+
+event _clear_socket_state(host_id: string) {
+	if (!osquery::hosts::isHostAlive(host_id)) { return; }
+
+	if (host_id !in host_sockets_idx_delete) { 
+		schedule 60sec { _clear_socket_state(host_id) };
+		return; 
+	}
+
+	local idx_delete: count;
 	local socket_infos_new: vector of SocketInfo = vector();
 	for (idx in host_sockets[host_id]) {
-		if (equalSocketInfos(host_sockets[host_id][idx], socket_info)) {
+		if (idx in host_sockets_idx_delete[host_id]) {
 			#print(fmt("Removed socket with tuple (%s:%d -> %s:%d) and protocol %d", local_address, local_port, remote_address, remote_port, protocol));
+			event socket_state_removed(host_id, host_sockets[host_id][idx]);
 			next;
 		}
 		socket_infos_new[|socket_infos_new|] = host_sockets[host_id][idx];
 	}
 	host_sockets[host_id] = socket_infos_new;
-	event socket_state_removed(host_id, socket_info);
+	delete host_sockets_idx_delete[host_id];
+	schedule 60sec { _clear_socket_state(host_id) };
 }
 
 event initial_socket_state(resultInfo: osquery::ResultInfo, action: string, pid: int, fd: int, family: int, protocol: int, local_address: string, remote_address: string, local_port: int, remote_port: int) {
@@ -248,7 +275,7 @@ event initial_socket_state(resultInfo: osquery::ResultInfo, action: string, pid:
 }
 
 event scheduled_remove_socket_state(host_id: string, action: string, pid: int, path: string, family: int, protocol: int, local_address: string, remote_address: string, local_port: int, remote_port: int, start_time: int, success: int) {
-	_remove_socket_state(host_id, action, pid, path, family, protocol, local_address, remote_address, local_port, remote_port, start_time, success);
+	_invalidate_socket_state(host_id, action, pid, path, family, protocol, local_address, remote_address, local_port, remote_port, start_time, success);
 }
 
 event socket_event_added(t: time, host_id: string, action: string, pid: int, path: string, family: int, protocol: int, local_address: string, remote_address: string, local_port: int, remote_port: int, start_time: int, success: int;) {
@@ -504,5 +531,6 @@ event verify_socket_state(host_id: string) {
 
 event osquery::host_connected(host_id: string) {
 	event verify_socket_state(host_id);
+	schedule 30sec { _clear_socket_state(host_id) };
 }
 
