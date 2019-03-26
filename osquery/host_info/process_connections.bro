@@ -47,21 +47,6 @@ export {
 
 global host_process_connections: table[string] of vector of ProcessConnections;
 
-function convert_conn_to_conntuple(c: connection, reverse: bool): osquery::sockets::ConnectionTuple {
-	local local_port: int = port_to_count(c$conn$id$orig_p) + 0;
-	local remote_port: int = port_to_count(c$conn$id$resp_p) + 0;
-	local proto = -1;
-	if (c$conn$proto == tcp) { proto = 6; }
-	else if (c$conn$proto == udp) { proto = 17; }
-
-	if (reverse) {
-		return [$local_address=c$conn$id$resp_h, $remote_address=c$conn$id$orig_h, $local_port=remote_port, $remote_port=local_port, $protocol=proto];
-	}
-
-	return [$local_address=c$conn$id$orig_h, $remote_address=c$conn$id$resp_h, $local_port=local_port, $remote_port=remote_port, $protocol=proto];
-
-}
-
 function getProcessConnectionsByHostIDByProcessID(host_id: string, pid: int): ProcessConnections {
 	if (host_id !in host_process_connections) { return []; }
 
@@ -217,7 +202,7 @@ function getProcessConnectionsByHostIDByConnection(host_id: string, conn: connec
 		# Iterate all connections of this process
 		for (idx_j in process_connections$socket_infos) {
 			local socket_info = process_connections$socket_infos[idx_j];
-			local conn_pattern = convert_conn_to_conntuple(conn, reverse);
+			local conn_pattern = osquery::sockets::convert_conn_to_conntuple(conn, reverse);
 
 			# Switch arguments
 			local c = socket_info$connection;

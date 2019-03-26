@@ -1,7 +1,7 @@
 #! Provide current socket information about hosts.
 
 @load osquery/framework
-#@load osquery/logging/tables/listening_ports
+@load osquery/logging/tables/listening_ports
 @load osquery/logging/tables/process_open_sockets
 @load osquery/logging/tables/socket_events
 
@@ -67,6 +67,8 @@ export {
 	##
 	## <params missing>
 	global socket_state_removed: event(host_id: string, socket_info: SocketInfo);
+
+	global convert_conn_to_conntuple: function(c: connection, reverse: bool): osquery::sockets::ConnectionTuple;
 }
 
 # Table to access SocketInfo by HostID
@@ -74,6 +76,21 @@ global host_sockets: table[string] of vector of SocketInfo;
 
 # SocketInfos to delete
 global host_sockets_idx_delete: table[string] of set[int];
+
+function convert_conn_to_conntuple(c: connection, reverse: bool): osquery::sockets::ConnectionTuple {
+	local local_port: int = port_to_count(c$id$orig_p) + 0;
+	local remote_port: int = port_to_count(c$id$resp_p) + 0;
+	local proto = -1;
+	local proto_type = get_port_transport_proto(c$id$orig_p);
+	if (proto_type == tcp) { proto = 6; }
+	else if (proto_type == udp) { proto = 17; }
+
+	if (reverse) {
+		return [$local_address=c$id$resp_h, $remote_address=c$id$orig_h, $local_port=remote_port, $remote_port=local_port, $protocol=proto];
+	}
+
+	return [$local_address=c$id$orig_h, $remote_address=c$id$resp_h, $local_port=local_port, $remote_port=remote_port, $protocol=proto];
+}
 
 function equalConnectionTuples(conn1: ConnectionTuple, conn2: ConnectionTuple): bool {
 	if (conn1?$local_address != conn2?$local_address) {
@@ -156,6 +173,8 @@ function _add_socket_state(host_id: string, action: string, pid: int, path: stri
 	if (local_address != "") local_addr = to_addr(local_address);
 	if (remote_address != "") remote_addr = to_addr(remote_address);
 
+	if (family != 2) { return; }
+
 	local conn: ConnectionTuple;
 	if (action == "snapshot") {
 		if (local_address == "" || local_port == 0) {
@@ -174,7 +193,7 @@ function _add_socket_state(host_id: string, action: string, pid: int, path: stri
 		}
 		conn = [$local_address=local_addr, $local_port=local_port, $protocol=protocol];
 	} else if (action == "connect") {
-		if (remote_address == "" || remote_port == 0) {
+		if (remote_address == "" || remote_address == "0.0.0.0" || remote_address == "::" || remote_port == 0) {
 			#print("Add Connect: Remote address or port is not given");
 			return;
 		}
