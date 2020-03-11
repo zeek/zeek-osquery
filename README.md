@@ -1,5 +1,5 @@
 # The Zeek-Osquery Project #
-This project adds a Zeek interface to the host monitor [osquery](https://osquery.io), enabling the network monitor [Zeek](https://www.zeek.org) (formerly known as Zeek) to subscribe to changes from hosts as a continous stream of events. The platform is controlled by Zeek scripts, which sends SQL-style queries to the hosts and then begin listening for any updates coming back. Host events are handled by Zeek scripts the same way as network events.
+This project adds a Zeek interface to the host monitor [osquery](https://osquery.io), enabling the network monitor [Zeek](https://www.zeek.org) (formerly known as Bro) to subscribe to changes from hosts as a continous stream of events. The platform is controlled by Zeek scripts, which sends SQL-style queries to the hosts and then begin listening for any updates coming back. Host events are handled by Zeek scripts the same way as network events.
 
 Here, you see an example script to be loaded by Zeek, using osquery and our zeek-osuqery framework to make hosts report about server applications as soon as it starts.
 ```
@@ -68,3 +68,11 @@ Osquery related logfiles are written to the Zeek log directory. Depending on the
 - When running Zeek in cluster mode, the manager already accepts incoming osquery connections via Broker, even though the custer did not build up completely, i.e., not all workers established Broker connections to the manager yet. When restarting the Zeek cluster and osquery hosts immediately reconnect, then state about hosts that reconnected before all workers reconnected is lost. Affected osquery hosts have to restart.
 
 - Independent from the previous issue, Zeek (i.e. the manager) sometimes retrieves no state about some osquery hosts when restarting Zeek. This is not deterministic w.r.t. all restarts and all osquery hosts. When happening, it seems that Zeek never received the `new_host` announce message from osquery. Affected osquery hosts have to restart.
+
+## Publications ##
+
+Zeek-osquery initially started as an academic prototype to gain fundamental experiences in correlating host and network data for advanced monitoring and intrusion detection. Based on this work, the successor [zeek-agent](https://github.com/zeek/zeek-agent) is developed. Our results and experiences with zeek-osquery will be presented at the _35th International Conference on ICT Systems Security and Privacy Protection_ (IFIP SEC 2020). If you refer to our project, please cite our paper:
+
+```
+Steffen Haas, Robin Sommer, Mathias Fischer: zeek-osquery: Host-Network Correlation for Advanced Monitoring and Intrusion Detection. Accepted for publication at 35th International Conference on ICT Systems Security and Privacy Protection (IFIP SEC '20), Maribor, Slovenia, May 2020.
+```
