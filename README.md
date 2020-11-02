@@ -1,3 +1,5 @@
+**This project is deprecated und superseeded by [zeek-agent](https://github.com/zeek/zeek-agent).**
+
 # The Zeek-Osquery Project #
 This project adds a Zeek interface to the host monitor [osquery](https://osquery.io), enabling the network monitor [Zeek](https://www.zeek.org) (formerly known as Bro) to subscribe to changes from hosts as a continous stream of events. The platform is controlled by Zeek scripts, which sends SQL-style queries to the hosts and then begin listening for any updates coming back. Host events are handled by Zeek scripts the same way as network events.
 
