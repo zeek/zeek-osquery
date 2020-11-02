@@ -1,1 +1,1 @@
-# **This project is deprecated and replaced [zeek-agent](https://github.com/zeek/zeek-agent).**
+# **This project is deprecated and replaced by [zeek-agent](https://github.com/zeek/zeek-agent).**
